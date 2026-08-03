@@ -1,0 +1,5 @@
+CREATE TABLE question (
+    id SERIAL PRIMARY KEY,
+    exam_id INT NOT NULL REFERENCES exam(id) ON DELETE CASCADE,
+    content TEXT NOT NULL
+);

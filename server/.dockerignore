@@ -1,0 +1,10 @@
+target
+**/target
+.git
+.gitignore
+.dockerignore
+.env
+*.log
+*.tmp
+*~
+node_modules

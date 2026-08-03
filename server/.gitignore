@@ -1,0 +1,22 @@
+.DS_Store
+/.vscode/
+.idea/
+.env
+.env.local
+.env.*.local
+/target/
+/build/
+server
+server.exe
+*.log
+*.tmp
+*.swp
+*~
+node_modules/
+Cargo.lock
+
+# OS files
+Thumbs.db
+
+# Backup files
+*.bak
