@@ -1,0 +1,14 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.104"
+axum = "0.8.9"
+diesel = { version = "2.3.11", features = ["postgres", "r2d2"] }
+diesel_migrations = "2.3.2"
+dotenv = "0.15.0"
+serde = { version = "1.0.229", features = ["derive"] }
+tokio = { version = "1.53.1", features = ["full"] }
+tower-http = { version = "0.7.0", features = ["cors"] }
