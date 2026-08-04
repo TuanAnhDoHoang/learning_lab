@@ -13,7 +13,6 @@ server.exe
 *.swp
 *~
 node_modules/
-Cargo.lock
 
 # OS files
 Thumbs.db

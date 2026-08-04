@@ -7,3 +7,5 @@ pub struct NewExam {
     pub domain_id: i32,
     pub name: String,
 }
+
+

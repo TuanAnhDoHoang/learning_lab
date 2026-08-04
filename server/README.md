@@ -81,13 +81,161 @@ docker compose down -v
 
 * **Success (200 OK):**
 ```json
-"Exam created successfully!"
+{
+  "exam_id": 9
+}
 
 ```
+### 2. Lấy danh sách bài kiểm tra (Get All Exams)
 
+* **Endpoint:** `GET /exams`
 
-* **Error (400 Bad Request / 500 Internal Error):**
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
 ```json
-"Transaction failed! All changes rolled back. Error: Invalid right_answer index in request payload"
+[
+  {
+    "id": 1,
+    "domain_id": 1,
+    "name": "Kiểm tra 15 phút - Đại số"
+  },
+  {
+    "id": 2,
+    "domain_id": 1,
+    "name": "Kiểm tra 15 phút - Hình học"
+  },
+  {
+    "id": 7,
+    "domain_id": 4,
+    "name": "Bài thi Kiến thức Rust & Database"
+  }
+]
+```
 
+---
+
+### 3. Lấy câu hỏi theo bài kiểm tra (Get Questions by Exam)
+
+* **Endpoint:** `GET /questions`
+* **Query Parameters:**
+
+| Tham số | Kiểu | Bắt buộc | Mô tả |
+|---|---|---|---|
+| `exam_id` | integer | Có | ID của bài kiểm tra cần lấy câu hỏi |
+
+#### 📥 Example Request:
+* **Endpoint:** `GET /questions?exam_id=9`
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
+```json
+{
+  "questions": [
+    {
+      "question": {
+        "id": 23,
+        "exam_id": 9,
+        "content": "Trong Diesel, hàm nào dùng để mở một Transaction?"
+      },
+      "answers": [
+        {
+          "id": 89,
+          "question_id": 23,
+          "content": "conn.start_transaction()"
+        },
+        {
+          "id": 90,
+          "question_id": 23,
+          "content": "conn.transaction()"
+        },
+        {
+          "id": 91,
+          "question_id": 23,
+          "content": "conn.begin()"
+        },
+        {
+          "id": 92,
+          "question_id": 23,
+          "content": "conn.execute_transaction()"
+        }
+      ]
+    },
+    {
+      "question": {
+        "id": 24,
+        "exam_id": 9,
+        "content": "Từ khóa nào trong SQL được dùng để xóa bảng?"
+      },
+      "answers": [
+        {
+          "id": 93,
+          "question_id": 24,
+          "content": "DELETE TABLE"
+        },
+        {
+          "id": 94,
+          "question_id": 24,
+          "content": "REMOVE TABLE"
+        },
+        {
+          "id": 95,
+          "question_id": 24,
+          "content": "DROP TABLE"
+        },
+        {
+          "id": 96,
+          "question_id": 24,
+          "content": "CLEAR TABLE"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### 4. Chấm điểm bài làm (Submit & Score Exam)
+
+* **Endpoint:** `POST /score`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "exam_id": 9,
+  "questions": [
+    {
+      "question": "Trong Diesel, hàm nào dùng để mở một Transaction?",
+      "answers": [
+        "conn.start_transaction()",
+        "conn.transaction()",
+        "conn.begin()",
+        "conn.execute_transaction()"
+      ],
+      "right_answer": 1
+    },
+    {
+      "question": "Từ khóa nào trong SQL được dùng để xóa bảng?",
+      "answers": [
+        "DELETE TABLE",
+        "REMOVE TABLE",
+        "DROP TABLE",
+        "CLEAR TABLE"
+      ],
+      "right_answer": 2
+    }
+  ]
+}
+```
+
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
+```json
+{
+  "score": 2,
+  "sum_of_question": 2
+}
 ```

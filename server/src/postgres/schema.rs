@@ -1,25 +1,26 @@
 use diesel::Queryable;
+use serde::{Serialize};
 #[derive(Debug, Queryable)]
 pub struct Domain {
     pub id: i32,
     pub name: String,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Serialize)]
 pub struct Exam {
     pub id: i32,
     pub domain_id: i32,
     pub name: String
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Serialize)]
 pub struct Question {
     pub id: i32,
     pub exam_id: i32,
     pub content: String,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Queryable, Serialize)]
 pub struct Answer {
     pub id: i32,
     pub question_id: i32,

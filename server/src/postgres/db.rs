@@ -2,9 +2,11 @@ use std::env;
 
 use anyhow::Context;
 use diesel::{
-    PgConnection, r2d2::{self, ConnectionManager, Pool},
+    connection::SimpleConnection,
+    r2d2::{self, ConnectionManager, Pool},
+    sql_query, PgConnection, RunQueryDsl,
 };
-use diesel_migrations::{EmbeddedMigrations, MigrationHarness, embed_migrations};
+use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
 pub type DbPool = r2d2::Pool<ConnectionManager<PgConnection>>;
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
@@ -28,5 +30,32 @@ pub fn migration(pool: &DbPool) -> anyhow::Result<()> {
     conn.run_pending_migrations(MIGRATIONS)
         .expect("Chạy database migration thất bại!");
     println!("Database Migrations hoàn tất thành công!");
+    Ok(())
+}
+
+#[derive(diesel::QueryableByName)]
+struct CountResult {
+    #[diesel(sql_type = diesel::sql_types::BigInt)]
+    count: i64,
+}
+
+pub fn seed_data(pool: &DbPool) -> anyhow::Result<()> {
+    let mut conn = pool
+        .get()
+        .expect("Failed to get a connection from the pool for migrations");
+
+    // Chỉ seed nếu bảng domain đang trống -> tránh lỗi trùng khóa khi restart
+    let count: i64 = sql_query("SELECT COUNT(*) as count FROM domain")
+        .get_result::<CountResult>(&mut conn)
+        .map(|r| r.count)
+        .unwrap_or(0);
+
+    if count == 0 {
+        let seed_sql = include_str!("../seeds/init.sql");
+        conn.batch_execute(seed_sql).expect("Failed to seed data");
+        println!("✅ Seed data inserted.");
+    } else {
+        println!("ℹ️ Domain table already has data, skip seeding.");
+    }
     Ok(())
 }
