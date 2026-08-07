@@ -6,9 +6,19 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.104"
 axum = "0.8.9"
-diesel = { version = "2.3.11", features = ["postgres", "r2d2"] }
+axum-extra ={ version="0.12.6", features=["cookie"]}
+bcrypt = "0.19.3"
+chrono = "0.4.45"
+diesel = { version = "2.3.11", features = ["postgres", "r2d2", "chrono"] }
+diesel-derive-enum = {version="2.1.0", features=["postgres"]}
 diesel_migrations = "2.3.2"
 dotenv = "0.15.0"
+hex = "0.4.3"
+jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto"] }
+regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
+sha2 = "0.11.0"
+time = "0.3.55"
 tokio = { version = "1.53.1", features = ["full"] }
 tower-http = { version = "0.7.0", features = ["cors"] }
+validator = { version = "0.21.0", features = ["derive"] }

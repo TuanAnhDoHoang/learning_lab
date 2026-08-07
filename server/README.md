@@ -42,7 +42,7 @@ docker compose down -v
 
 ### 1. Tạo bài kiểm tra mới (Create Exam)
 
-* **Endpoint:** `POST /new_exam`
+* **Endpoint:** `POST /api/new_exam`
 * **Content-Type:** `application/json`
 
 #### 📥 Example Request Payload:
@@ -88,7 +88,7 @@ docker compose down -v
 ```
 ### 2. Lấy danh sách bài kiểm tra (Get All Exams)
 
-* **Endpoint:** `GET /exams`
+* **Endpoint:** `GET /api/exams`
 
 #### 📤 Response Mẫu:
 
@@ -117,7 +117,7 @@ docker compose down -v
 
 ### 3. Lấy câu hỏi theo bài kiểm tra (Get Questions by Exam)
 
-* **Endpoint:** `GET /questions`
+* **Endpoint:** `GET /api/questions`
 * **Query Parameters:**
 
 | Tham số | Kiểu | Bắt buộc | Mô tả |
@@ -125,7 +125,7 @@ docker compose down -v
 | `exam_id` | integer | Có | ID của bài kiểm tra cần lấy câu hỏi |
 
 #### 📥 Example Request:
-* **Endpoint:** `GET /questions?exam_id=9`
+* **Endpoint:** `GET /api/questions?exam_id=9`
 #### 📤 Response Mẫu:
 
 * **Success (200 OK):**
@@ -198,7 +198,7 @@ docker compose down -v
 
 ### 4. Chấm điểm bài làm (Submit & Score Exam)
 
-* **Endpoint:** `POST /score`
+* **Endpoint:** `POST /api/score`
 * **Content-Type:** `application/json`
 
 #### 📥 Example Request Payload:
@@ -237,5 +237,55 @@ docker compose down -v
 {
   "score": 2,
   "sum_of_question": 2
+}
+```
+
+
+
+### 5.Đăng ký tài khoản  
+
+* **Endpoint:** `POST /api/register`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+    "email": "anhdoo@gmail.com",
+    "username": "anhdoo",
+    "password": "Anhdoo#1004",
+    "role": "user"
+}
+```
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
+```json
+{
+  "userid": 1,
+  "username": "anhdoo",
+  "email": "anhdoo1211@gmail.com"
+}
+```
+
+### 6.Đăng nhập tài khoản  
+
+* **Endpoint:** `POST /api/login`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+    "email": "anhdoo1211@gmail.com",
+    "password": "Anhdoo#1004"
+}
+```
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
+```json
+{
+  "userid": 1,
+  "username": "anhdoo",
+  "email": "anhdoo1211@gmail.com"
 }
 ```

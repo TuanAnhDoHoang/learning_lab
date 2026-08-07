@@ -9,17 +9,21 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
+use axum_extra::extract::CookieJar;
+use bcrypt::{hash, verify, DEFAULT_COST};
+use chrono::{NaiveDateTime, TimeDelta, Utc};
 use diesel::{
     dsl::exists, query_dsl::methods::FilterDsl, Connection, OptionalExtension, RunQueryDsl,
 };
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, env};
+use std::{env, str::FromStr};
 use tower_http::cors::{Any, CorsLayer}; // Import các module r2d2
 
 mod postgres;
 pub mod schema;
 pub mod service;
+pub mod utils;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -42,13 +46,17 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
-    // Build application with a single route
-    let app = Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
+    let api_routes = Router::new()
         .route("/new_exam", post(create_new_exam))
         .route("/exams", get(get_exams))
         .route("/questions", get(get_question))
         .route("/score", post(handle_score))
+        .route("/register", post(register))
+        .route("/login", post(login));
+
+    let app = Router::new()
+        .route("/", get(|| async { "Hello, World!" }))
+        .nest("/api", api_routes)
         .layer(cors)
         .with_state(app_state);
 
@@ -85,15 +93,21 @@ use crate::{
     diesel::ExpressionMethods,
     postgres::{
         db::{self, DbPool},
-        schema::{Answer, AnswerMap, Exam, Question},
+        schema::{Answer, AnswerMap, Exam, Question, Users},
     },
     schema::{
         answer::{self},
-        answer_map, exam, question,
+        answer_map, exam, question, refresh_tokens, users,
     },
     service::{
-        answer::NewAnswer, answer_map::NewAnswerMap, domain::NewDomain, question::NewQuestion,
+        answer::NewAnswer,
+        answer_map::NewAnswerMap,
+        domain::NewDomain,
+        question::NewQuestion,
+        token::{self, verify_token, NewRefeshToken},
+        users::{NewUsers, ROLE},
     },
+    utils::authentication::{default_cookie, Credentials, RegisterData},
 };
 #[derive(Serialize)]
 struct CreateExamResponse {
@@ -202,7 +216,10 @@ async fn create_new_exam(
     })?;
 
     if new_exam_id == 0 {
-        Err((StatusCode::INTERNAL_SERVER_ERROR, "Error during creating new exam".to_string()))
+        Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error during creating new exam".to_string(),
+        ))
     } else {
         Ok(Json(CreateExamResponse {
             exam_id: new_exam_id,
@@ -415,4 +432,250 @@ async fn handle_score(
             "Error during scoring exam".to_string(),
         ))
     }
+}
+
+#[derive(Deserialize)]
+struct RegisterRequest {
+    email: String,
+    username: String,
+    password: String,
+    role: String,
+}
+
+#[derive(Serialize)]
+struct RegisterResponse {
+    userid: i32,
+    username: String,
+    email: String,
+}
+async fn register(
+    State(app_state): State<AppState>,
+    Json(register_request): Json<RegisterRequest>,
+) -> Result<Json<RegisterResponse>, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+
+    let role = ROLE::from_str(&register_request.role).unwrap();
+    let register_data = RegisterData {
+        email: register_request.email,
+        password: register_request.password,
+        username: register_request.username,
+        role,
+    };
+
+    let email_exists: bool = diesel::select(exists(
+        users::table.filter(users::email.eq(&register_data.email)),
+    ))
+    .get_result(&mut conn)
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?;
+
+    if email_exists {
+        return Err((StatusCode::BAD_REQUEST, format!("Email has existed")));
+    }
+
+    let username_exists: bool = diesel::select(exists(
+        users::table.filter(users::name.eq(&register_data.username)),
+    ))
+    .get_result(&mut conn)
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?;
+
+    if username_exists {
+        return Err((StatusCode::BAD_REQUEST, format!("User name has existed")));
+    }
+
+    //check if user exist
+    let email_exists: bool = diesel::select(exists(
+        users::table.filter(users::email.eq(&register_data.email)),
+    ))
+    .get_result(&mut conn)
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Database error: {}", e),
+        )
+    })?;
+
+    if email_exists {
+        return Err((StatusCode::BAD_REQUEST, format!("Email has existed")));
+    }
+
+    register_data.validate_credentials().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Invalid credentials: {}", e),
+        )
+    })?;
+
+    let password_hash = hash(&register_data.password, DEFAULT_COST).map_err(|_e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Error when handle password"),
+        )
+    })?;
+
+    let new_user = NewUsers {
+        email: &register_data.email,
+        name: &register_data.username,
+        password: &password_hash,
+        role: register_data.role,
+    };
+
+    let user_inserted: Users = diesel::insert_into(users::table)
+        .values(new_user)
+        .get_result(&mut conn)
+        .map_err(|_e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error during create user"),
+            )
+        })?;
+
+    let register_response = RegisterResponse {
+        userid: user_inserted.id,
+        email: user_inserted.email,
+        username: user_inserted.name,
+    };
+
+    Ok(Json(register_response))
+}
+
+#[derive(Deserialize)]
+struct LoginRequest {
+    email: String,
+    password: String,
+}
+
+#[derive(Serialize)]
+struct LoginResponse {
+    userid: i32,
+    username: String,
+    email: String,
+}
+async fn login(
+    State(app_state): State<AppState>,
+    jar: CookieJar,
+    Json(login_request): Json<LoginRequest>,
+) -> Result<(CookieJar, Json<LoginResponse>), (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+
+    // Tìm user theo email — KHÔNG tiết lộ "email không tồn tại" vs "sai password"
+    let user: Users = users::table
+        .filter(users::email.eq(&login_request.email))
+        .first(&mut conn)
+        .map_err(|_| {
+            (
+                StatusCode::UNAUTHORIZED,
+                "Invalid email or password".to_string(),
+            )
+        })?;
+
+    // Verify password
+    let is_valid = verify(login_request.password, &user.password).map_err(|_e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error verifying credentials".to_string(),
+        )
+    })?;
+
+    if !is_valid {
+        // Verify password
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            "Invalid email or password".to_string(),
+        ));
+    }
+
+    //config expire time for tokens
+    let now = Utc::now().naive_utc();
+    let refesh_expires_time = now + TimeDelta::days(30);
+    let access_expires_time = now + TimeDelta::hours(1);
+
+    let refesh_token = token::new_token(
+        user.id,
+        &user.name,
+        &user.email,
+        "access",
+        refesh_expires_time,
+    )
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error during create new refesh token".to_string(),
+        )
+    })?;
+    let refesh_token_hash = token::hash_token(&refesh_token);
+
+    let new_refresh_token_row = NewRefeshToken {
+        user_id: user.id,
+        token_hash: &refesh_token_hash,
+        is_revoked: false,
+        device_info: "",
+        user_agent: "",
+        expires_at: refesh_expires_time,
+        created_at: Utc::now().naive_utc(),
+    };
+
+    diesel::insert_into(refresh_tokens::table)
+        .values(&new_refresh_token_row)
+        .execute(&mut conn)
+        .map_err(|_e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Error saving new refresh token".to_string(),
+            )
+        })?;
+
+    let access_token = token::new_token(
+        user.id,
+        &user.name,
+        &user.email,
+        "access",
+        access_expires_time,
+    )
+    .map_err(|_| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error during create new refesh token".to_string(),
+        )
+    })?;
+
+    let access_max_age_hours = (access_expires_time - now).num_hours(); // = 1
+    let refesh_max_age_hours = (refesh_expires_time - now).num_hours(); // = 720
+    let cookie = jar
+        .add(default_cookie(
+            "access_token",
+            access_token,
+            access_max_age_hours,
+        ))
+        .add(default_cookie(
+            "refesh_token",
+            refesh_token,
+            refesh_max_age_hours,
+        ));
+
+    let login_response = LoginResponse {
+        email: user.email,
+        userid: user.id,
+        username: user.name,
+    };
+    Ok((cookie, Json(login_response)))
 }
