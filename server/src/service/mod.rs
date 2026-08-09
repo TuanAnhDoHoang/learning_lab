@@ -5,3 +5,4 @@ pub mod answer_map;
 pub mod question;
 pub mod users;  
 pub mod token;
+pub mod score;  

@@ -1,10 +1,12 @@
 use std::env;
 
 use crate::schema::refresh_tokens;
-use anyhow::Context;
 use anyhow::anyhow;
+use anyhow::Context;
 use chrono::NaiveDateTime;
+use chrono::Utc;
 use diesel::Insertable;
+use diesel::PgConnection;
 use diesel::QueryableByName;
 #[derive(Debug, Insertable, QueryableByName)]
 #[table_name = "refresh_tokens"]
@@ -18,6 +20,7 @@ pub struct NewRefeshToken<'a> {
     pub created_at: NaiveDateTime,
 }
 
+use diesel::RunQueryDsl;
 use jsonwebtoken::decode;
 use jsonwebtoken::encode;
 use jsonwebtoken::Algorithm;
@@ -30,10 +33,10 @@ use sha2::Digest;
 use sha2::Sha256;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: i32,       // user_id — đủ để identify, các thông tin khác query lại DB nếu cần
+    pub sub: i32, // user_id — đủ để identify, các thông tin khác query lại DB nếu cần
     pub name: String,
     pub email: String,
-    pub typ: String,     // "access" | "refresh" — phân biệt loại token
+    pub typ: String, // "access" | "refresh" — phân biệt loại token
     pub exp: usize,
 }
 
@@ -75,11 +78,29 @@ pub fn verify_token(token: &str, expected_typ: &str) -> anyhow::Result<Claims> {
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
         &Validation::new(Algorithm::HS256),
-    ).context(format!("Error during decoding token {}", expected_typ))?;
+    )
+    .context(format!("Error during decoding token {}", expected_typ))?;
 
     if token_data.claims.typ != expected_typ {
         return Err(anyhow!("Invalid token type"));
     }
 
     Ok(token_data.claims)
+}
+
+pub fn insert_token(userid: i32, hash_token: &str, expires_time: NaiveDateTime, conn: &mut PgConnection) -> anyhow::Result<()> {
+    let new_refresh_token_row = NewRefeshToken {
+        user_id: userid,
+        token_hash: hash_token,
+        is_revoked: false,
+        device_info: "",
+        user_agent: "",
+        expires_at: expires_time,
+        created_at: Utc::now().naive_utc(),
+    };
+
+    diesel::insert_into(refresh_tokens::table)
+        .values(&new_refresh_token_row)
+        .execute(conn)?;
+    Ok(())
 }
