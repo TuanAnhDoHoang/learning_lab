@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { ThemeMode } from '../types';
+import { ThemeMode } from '..';
 
 interface ThemeContextType {
   theme: ThemeMode;
@@ -12,7 +12,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [theme, setTheme] = useState<ThemeMode>(() => {
     const saved = localStorage.getItem('lab_train_theme');
     if (saved === 'light' || saved === 'dark') return saved;
-    return 'dark';
+    return 'light';
   });
 
   useEffect(() => {

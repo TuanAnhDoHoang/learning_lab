@@ -1,9 +1,29 @@
-import React, { useState } from 'react';
-import { trendingList } from '../data/mockData';
+import React, { useState, useEffect } from 'react';
+import { Exam } from '..';
+import { fetchExams } from '../api/apicaller';
+
+// Map domain_id to domain name
+const DOMAIN_MAP: Record<number, string> = {
+  1: 'Toán học',
+  2: 'Vật lý',
+  3: 'Hóa học',
+};
 
 export const Sidebar: React.FC = () => {
   const [numCorrect, setNumCorrect] = useState<string>('');
   const [result, setResult] = useState<string>('-');
+  const [featuredExams, setFeaturedExams] = useState<Exam[]>([]);
+
+  useEffect(() => {
+    fetchExams()
+      .then((data: Exam[]) => {
+        // Show up to 3 exams as "featured"
+        setFeaturedExams(data.slice(0, 3));
+      })
+      .catch(() => {
+        setFeaturedExams([]);
+      });
+  }, []);
 
   const handleCalculate = () => {
     const val = parseInt(numCorrect);
@@ -52,12 +72,12 @@ export const Sidebar: React.FC = () => {
       <div className="widget stats-widget">
         <h4 className="widget-subtitle">🔥 Đề thi nổi bật hôm nay</h4>
         <ul className="trending-list">
-          {trendingList.map((item) => (
-            <li key={item.rank}>
-              <span className="rank-num">{item.rank}</span>
+          {featuredExams.map((exam, index) => (
+            <li key={exam.id}>
+              <span className="rank-num">{index + 1}</span>
               <div className="rank-info">
-                <a href="#">{item.title}</a>
-                <span>{item.takers}</span>
+                <a href="#">{exam.name}</a>
+                <span>{DOMAIN_MAP[exam.domain_id] || 'Khác'}</span>
               </div>
             </li>
           ))}

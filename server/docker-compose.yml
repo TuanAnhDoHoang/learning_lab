@@ -27,6 +27,13 @@ services:
       - .env
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+    networks:
+      - default
+      - learning-lab-net
 
 volumes:
   pgdata: {}
+
+networks:
+  learning-lab-net:
+    external: true

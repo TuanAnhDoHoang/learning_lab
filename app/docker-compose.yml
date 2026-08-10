@@ -3,10 +3,16 @@ version: '3.8'
 services:
   frontend:
     build:
-      context: ./app
+      context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:80"
+      - "5173:80"
     environment:
       - NODE_ENV=production
     restart: always
+    networks:
+      - learning-lab-net
+
+networks:
+  learning-lab-net:
+    external: true
