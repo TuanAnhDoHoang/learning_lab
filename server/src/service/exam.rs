@@ -1,4 +1,3 @@
-use crate::postgres::db::DbPool;
 use crate::postgres::schema::Exam;
 use crate::schema::exam;
 use crate::service::question::QuestionRequest;

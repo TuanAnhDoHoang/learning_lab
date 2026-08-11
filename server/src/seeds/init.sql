@@ -177,13 +177,23 @@ INSERT INTO answer_map (question_id, answer_id) VALUES
     (17, 65), -- C2H5OH
     (18, 69); -- Metan (CH4)
 
+
 -- ---------------------------------------------------------
--- 6. Đồng bộ lại sequence sau khi insert id thủ công
+-- 6. USERS (Thông tin người dùng)
+-- ---------------------------------------------------------
+INSERT INTO users (id, email, name, password, role) VALUES
+    (1, 'anhdoo1211@gmail.com', 'anhdoo', '$2b$12$13Wi9KoLf5rjyKZiXKQit.l8sAyrmP4JjFoPoi4GaZItEHffEWNES', 'admin'),
+    (2, 'user@gmail.com', 'scibidi', '$2b$12$wrR6huHjUvxxCf8aPvgJJejbCsnbZwbmnC/DWWHrmw9axRPhGTFMu', 'user'),
+    (3, 'anhdoo@gmail.com', 'anhdoo9090', '$2b$12$oErhlNnbBnXZr.wCBF4dV.xKskcoXbdaolMYGQFgWMwGe0Z4.ydQq', 'admin');
+
+-- ---------------------------------------------------------
+-- 7. Đồng bộ lại sequence sau khi insert id thủ công
 -- (bắt buộc vì các cột id là SERIAL/auto-increment)
 -- ---------------------------------------------------------
 SELECT setval(pg_get_serial_sequence('domain', 'id'), (SELECT MAX(id) FROM domain));
 SELECT setval(pg_get_serial_sequence('exam', 'id'), (SELECT MAX(id) FROM exam));
 SELECT setval(pg_get_serial_sequence('question', 'id'), (SELECT MAX(id) FROM question));
 SELECT setval(pg_get_serial_sequence('answer', 'id'), (SELECT MAX(id) FROM answer));
+SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users));
 
 COMMIT;

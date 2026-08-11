@@ -104,3 +104,15 @@ pub fn insert_token(userid: i32, hash_token: &str, expires_time: NaiveDateTime, 
         .execute(conn)?;
     Ok(())
 }
+
+
+#[derive(Deserialize)]
+pub struct RefeshRequest {
+    pub refresh_token: String,
+}
+
+#[derive(Serialize)]
+pub struct RefeshResponse {
+    pub refresh_token: String,
+    pub access_token: String,
+}

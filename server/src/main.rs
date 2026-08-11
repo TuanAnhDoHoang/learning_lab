@@ -6,6 +6,7 @@ use std::env;
 
 use anyhow::Context;
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
 };
@@ -17,9 +18,11 @@ use crate::{
         exam::{create_new_exam, get_exams},
         question::get_question,
         score::handle_score,
-        user::{login, register},
+        token::refresh,
+        user::{login, provide_priviliged, register},
     },
     postgres::db::{self, DbPool},
+    utils::authentication::authorization_middleware,
 };
 
 mod handlers;
@@ -42,6 +45,8 @@ async fn main() -> anyhow::Result<()> {
 
     db::seed_data(&pool)?;
 
+    let admin_route = env::var("ADMIN_ROUTE")?;
+
     let app_state = AppState { db_pool: pool };
 
     let cors = CorsLayer::new()
@@ -49,17 +54,33 @@ async fn main() -> anyhow::Result<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    let auth_routes = Router::new()
+        .route("/register", post(register))
+        .route("/login", post(login))
+        .route("/refresh", post(refresh));
+
     let api_routes = Router::new()
         .route("/new_exam", post(create_new_exam))
         .route("/exams", get(get_exams))
         .route("/questions", get(get_question))
         .route("/score", post(handle_score))
-        .route("/register", post(register))
-        .route("/login", post(login));
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            authorization_middleware,
+        ));
+
+    let admin_routes = Router::new()
+        .route("/provide_priviliged", post(provide_priviliged))
+        .layer(middleware::from_fn_with_state(
+            app_state.clone(),
+            authorization_middleware,
+        ));
 
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .nest("/api", api_routes)
+        .nest(format!("/{}", admin_route).as_str(), admin_routes)
+        .nest("/auth", auth_routes)
         .layer(cors)
         .with_state(app_state);
 

@@ -1,16 +1,18 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::State, http::StatusCode, Extension, Json};
 use axum_extra::extract::CookieJar;
 use bcrypt::verify;
 use chrono::{TimeDelta, Utc};
-use std::str::FromStr;
+use diesel::{query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
+use serde::Deserialize;
 
 use crate::{
     postgres::schema::Users,
+    schema::users,
     service::{
         token::{self, insert_token},
         users::{
             check_email_exist, check_username_exist, find_user_by_email, new_user, LoginRequest,
-            LoginResponse, RegisterRequest, RegisterResponse, ROLE,
+            LoginResponse, ProvidePriviligedResponse, RegisterRequest, RegisterResponse, ROLE,
         },
     },
     utils::authentication::{default_cookie, Credentials, RegisterData},
@@ -28,12 +30,12 @@ pub async fn register(
         )
     })?;
 
-    let role = ROLE::from_str(&register_request.role).unwrap();
+    // let role = ROLE::from_str(&register_request.role).unwrap();
     let register_data = RegisterData {
         email: register_request.email,
         password: register_request.password,
         username: register_request.username,
-        role,
+        role: ROLE::USER,
     };
 
     let email_exists: bool = check_email_exist(&register_data.email, &mut conn).map_err(|e| {
@@ -72,6 +74,8 @@ pub async fn register(
             format!("Error during create new user: {}", e),
         )
     })?;
+
+    println!("user_inserted: {:?}", user_inserted);
 
     let register_response = RegisterResponse {
         userid: user_inserted.id,
@@ -127,7 +131,7 @@ pub async fn login(
         user.id,
         &user.name,
         &user.email,
-        "access",
+        "refresh",
         refesh_expires_time,
     )
     .map_err(|_| {
@@ -179,4 +183,49 @@ pub async fn login(
         username: user.name,
     };
     Ok((cookie, Json(login_response)))
+}
+
+#[derive(Deserialize)]
+pub struct ProvidePriviligedRequest {
+    pub user_id: i32,
+}
+
+pub async fn provide_priviliged(
+    State(app_state): State<AppState>,
+    Extension(user): Extension<Users>,
+    Json(req): Json<ProvidePriviligedRequest>,
+) -> Result<Json<ProvidePriviligedResponse>, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+    let check_admin = match user.role {
+        ROLE::ADMIN => true,
+        _ => false,
+    };
+    if !check_admin {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            format!("You are not administrator"),
+        ));
+    }
+
+    let user_update = diesel::update(users::table.filter(users::id.eq(req.user_id)))
+        .set(users::role.eq(ROLE::ADMIN))
+        .get_result::<Users>(&mut conn)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error during provide priviliged: {}", e),
+            )
+        })?;
+
+    let response = ProvidePriviligedResponse {
+        userid: user_update.id,
+        role: user_update.role.to_string(),
+    };
+
+    Ok(Json(response))
 }

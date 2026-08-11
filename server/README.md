@@ -40,6 +40,14 @@ docker compose down -v
 
 ## 📡 API Reference
 
+### 0. User admin sample
+```json
+{
+  "email":"anhdoo@gmail.com",
+  "password":"Anhdoo#1004"
+}
+```
+
 ### 1. Tạo bài kiểm tra mới (Create Exam)
 
 * **Endpoint:** `POST /api/new_exam`
@@ -240,11 +248,9 @@ docker compose down -v
 }
 ```
 
-
-
 ### 5.Đăng ký tài khoản  
 
-* **Endpoint:** `POST /api/register`
+* **Endpoint:** `POST /auth/register`
 * **Content-Type:** `application/json`
 
 #### 📥 Example Request Payload:
@@ -269,7 +275,7 @@ docker compose down -v
 
 ### 6.Đăng nhập tài khoản  
 
-* **Endpoint:** `POST /api/login`
+* **Endpoint:** `POST /auth/login`
 * **Content-Type:** `application/json`
 
 #### 📥 Example Request Payload:
@@ -287,5 +293,47 @@ docker compose down -v
   "userid": 1,
   "username": "anhdoo",
   "email": "anhdoo1211@gmail.com"
+}
+```
+
+### 7.Refresh token
+
+* **Endpoint:** `POST /auth/refresh`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "refresh_token": "<YOUR_REFRESH_TOKEN>",
+}
+```
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
+```json
+{
+  "refresh_token":"<NEW_REFRESH_TOKEN>",
+  "access_token": "<NEW_ACCESS_TOKEN>"
+}
+```
+
+### 8.Provide admin role
+
+* **Endpoint:** `POST /<secret route trong .env>/provide_priviliged`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+    "user_id": 2,
+}
+```
+#### 📤 Response Mẫu:
+
+* **Success (200 OK):**
+```json
+{
+  "userid": 2,
+  "role": "admin"
 }
 ```

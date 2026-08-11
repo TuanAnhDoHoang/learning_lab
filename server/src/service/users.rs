@@ -56,7 +56,6 @@ pub struct RegisterRequest {
     pub email: String,
     pub username: String,
     pub password: String,
-    pub role: String,
 }
 
 #[derive(Serialize)]
@@ -112,4 +111,17 @@ pub fn find_user_by_email(email: &str, conn: &mut PgConnection) -> anyhow::Resul
         .filter(users::email.eq(email))
         .first(conn)?;
     Ok(user)
+}
+
+pub fn find_user_by_id(id: i32, conn: &mut PgConnection) -> anyhow::Result<Users>{
+    let user: Users = users::table
+        .filter(users::id.eq(id))
+        .first(conn)?;
+    Ok(user)
+}
+
+#[derive(Serialize)]
+pub struct ProvidePriviligedResponse{
+    pub userid: i32,
+    pub role: String
 }

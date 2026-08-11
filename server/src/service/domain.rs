@@ -20,6 +20,7 @@ pub fn new_domain(name: &str, conn: &mut PgConnection) -> anyhow::Result<Domain>
         .get_result(conn)?;
     Ok(inserted_domain)
 }
+
 pub fn get_existed_domain(name: &str, conn: &mut PgConnection) -> anyhow::Result<Option<Domain>> {
     let domain_existed: Option<Domain> = domain::table
         .filter(domain::name.eq(name))

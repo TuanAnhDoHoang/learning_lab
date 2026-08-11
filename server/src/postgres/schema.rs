@@ -35,7 +35,7 @@ pub struct AnswerMap {
     pub answer_id: i32,
 }
 
-#[derive(Debug, Queryable)]
+#[derive(Debug, Clone, Queryable)]
 pub struct Users {
     pub id: i32,
     pub email: String,
@@ -46,12 +46,12 @@ pub struct Users {
 
 #[derive(Debug, Queryable)]
 pub struct RefeshToken {
-    id: i32,
-    token_hash: String,
-    user_id: i32,
-    device_info: Option<String>,
-    user_agent: Option<String>,
-    is_revoked: bool,
-    expires_at: NaiveDateTime,
-    created_at: NaiveDateTime,
+    pub id: i32,
+    pub token_hash: String,
+    pub user_id: i32,
+    pub device_info: Option<String>,
+    pub user_agent: Option<String>,
+    pub is_revoked: bool,
+    pub expires_at: NaiveDateTime,
+    pub created_at: NaiveDateTime,
 }

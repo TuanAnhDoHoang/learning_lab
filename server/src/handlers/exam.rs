@@ -1,8 +1,8 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{extract::State, http::StatusCode, Extension, Json};
 use diesel::{Connection, RunQueryDsl};
 
 use crate::{
-    postgres::schema::Exam,
+    postgres::schema::{Exam, Users},
     schema::exam,
     service::{
         answer::new_answer,
@@ -10,12 +10,14 @@ use crate::{
         domain::{get_existed_domain, new_domain},
         exam::{new_exam, CreateExamRequest, CreateExamResponse},
         question::new_question,
+        users::ROLE,
     },
     AppState,
 };
 
 pub async fn create_new_exam(
     State(app_state): State<AppState>,
+    Extension(user): Extension<Users>,
     Json(payload): Json<CreateExamRequest>,
 ) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
     let mut conn = app_state.db_pool.get().map_err(|e| {
@@ -24,6 +26,18 @@ pub async fn create_new_exam(
             format!("Can not connect to database: {}", e),
         )
     })?;
+
+    let check_user_role = match user.role {
+        ROLE::ADMIN => true,
+        _ => false,
+    };
+    
+    if !check_user_role{
+        return Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "You have no permission".to_string(),
+        ))
+    }
 
     let mut new_exam_id = 0;
 
@@ -120,6 +134,7 @@ pub async fn get_exams(
             format!("Can not connect to database: {}", e),
         )
     })?;
+
     let all_exam: Vec<Exam> = exam::table.load::<Exam>(&mut conn).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

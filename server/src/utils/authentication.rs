@@ -1,9 +1,21 @@
+use axum::{
+    body::Body,
+    extract::{Request, State},
+    http::{self, Response, StatusCode},
+    middleware::Next,
+};
 use axum_extra::extract::cookie::Cookie;
 use regex::Regex;
 use time::Duration;
 use validator::{Validate, ValidationError};
 
-use crate::service::users::ROLE;
+use crate::{
+    service::{
+        token::{self},
+        users::{find_user_by_email, ROLE},
+    },
+    AppState,
+};
 
 pub(crate) fn default_cookie<'a>(key: &str, token: String, duration_hrs: i64) -> Cookie<'a> {
     Cookie::build((key.to_string(), token))
@@ -118,4 +130,64 @@ fn validate_username(username: &str) -> Result<(), ValidationError> {
     }
 
     Ok(())
+}
+
+pub async fn authorization_middleware(
+    State(app_state): State<AppState>,
+    mut req: Request,
+    next: Next,
+) -> Result<Response<Body>, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+
+    let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
+    let auth_header = match auth_header {
+        Some(header) => header.to_str().map_err(|_| {
+            (
+                StatusCode::FORBIDDEN,
+                "Empty header is not allowed".to_string(),
+            )
+        })?,
+        None => {
+            return Err((
+                StatusCode::FORBIDDEN,
+                "Please add the JWT token to the header".to_string(),
+            ))
+        }
+    };
+    let mut header = auth_header.split_whitespace();
+    let (bearer, token) = (header.next(), header.next());
+
+    let bearer = bearer.ok_or((StatusCode::FORBIDDEN, "Missing token".to_string()))?;
+    if bearer != "Bearer" {
+        return Err((StatusCode::FORBIDDEN, "Missing Bearer".to_string()));
+    }
+
+    let token = token.ok_or((StatusCode::FORBIDDEN, "Missing token".to_string()))?;
+
+    let token_data = match token::verify_token(token, "access") {
+        Ok(data) => data,
+        Err(_) => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "Unable to decode token".to_string(),
+            ))
+        }
+    };
+    // Fetch the user details from the database
+    let current_user = match find_user_by_email(&token_data.email, &mut conn) {
+        Ok(user) => user,
+        Err(_) => {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "You are not an authorized user".to_string(),
+            ))
+        }
+    };
+    req.extensions_mut().insert(current_user);
+    Ok(next.run(req).await)
 }
