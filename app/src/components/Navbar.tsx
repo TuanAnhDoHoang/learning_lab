@@ -1,8 +1,10 @@
 import React from 'react';
-import { useTheme } from '../context/ThemeContext';
 
-export const Navbar: React.FC = () => {
-  const { theme, toggleTheme } = useTheme();
+interface NavbarProps {
+  onOpenLogin?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onOpenLogin }) => {
 
   return (
     <header className="navbar">
@@ -32,17 +34,8 @@ export const Navbar: React.FC = () => {
           </a>
           <a href="#de-thi" className="nav-item active">Đề thi online</a>
           <a href="#flashcards" className="nav-item">Flashcards</a>
-          
-          {/* Theme Toggle Switch */}
-          <button 
-            className="btn-theme-toggle" 
-            onClick={toggleTheme} 
-            title={`Chuyển sang chế độ ${theme === 'dark' ? 'sáng' : 'tối'}`}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
 
-          <button className="btn-login">Đăng nhập</button>
+          <button className="btn-login" onClick={onOpenLogin}>Đăng nhập</button>
         </nav>
       </div>
     </header>
