@@ -19,7 +19,7 @@ use crate::{
         question::get_question,
         score::handle_score,
         token::refresh,
-        user::{login, provide_priviliged, register},
+        user::{login, logout, provide_priviliged, register},
     },
     postgres::db::{self, DbPool},
     utils::authentication::authorization_middleware,
@@ -59,6 +59,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/login", post(login))
         .route("/refresh", post(refresh));
 
+    let logout_routes =
+        Router::new()
+            .route("/logout", post(logout))
+            .layer(middleware::from_fn_with_state(
+                app_state.clone(),
+                authorization_middleware,
+            ));
+
     let api_routes = Router::new()
         .route("/new_exam", post(create_new_exam))
         .route("/exams", get(get_exams))
@@ -81,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api", api_routes)
         .nest(format!("/{}", admin_route).as_str(), admin_routes)
         .nest("/auth", auth_routes)
+        .nest("/auth", logout_routes)
         .layer(cors)
         .with_state(app_state);
 

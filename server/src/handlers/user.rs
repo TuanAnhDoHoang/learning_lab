@@ -6,17 +6,11 @@ use diesel::{query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
 use serde::Deserialize;
 
 use crate::{
-    postgres::schema::Users,
-    schema::users,
-    service::{
-        token::{self, insert_token},
-        users::{
-            check_email_exist, check_username_exist, find_user_by_email, new_user, LoginRequest,
-            LoginResponse, ProvidePriviligedResponse, RegisterRequest, RegisterResponse, ROLE,
+    AppState, postgres::schema::{RefeshToken, Users}, schema::{refresh_tokens, users}, service::{
+        token::{self, RefeshRequest, insert_token}, users::{
+            LoginRequest, LoginResponse, ProvidePriviligedResponse, ROLE, RegisterRequest, RegisterResponse, check_email_exist, check_username_exist, find_user_by_email, new_user,
         },
-    },
-    utils::authentication::{default_cookie, Credentials, RegisterData},
-    AppState,
+    }, utils::authentication::{Credentials, RegisterData, default_cookie},
 };
 
 pub async fn register(
@@ -183,6 +177,36 @@ pub async fn login(
         username: user.name,
     };
     Ok((cookie, Json(login_response)))
+}
+
+pub async fn logout(
+    State(app_state): State<AppState>,
+    Extension(user): Extension<Users>,
+    Json(payload): Json<RefeshRequest>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("DB error: {}", e),
+        )
+    })?;
+
+    let refresh_token = token::hash_token(&payload.refresh_token);
+
+    diesel::update(refresh_tokens::table
+        .filter(refresh_tokens::token_hash.eq(refresh_token)))
+        .filter(refresh_tokens::user_id.eq(user.id))
+        .filter(refresh_tokens::is_revoked.eq(false))
+        .set(refresh_tokens::is_revoked.eq(true))
+        .execute(&mut conn)
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Error during revoke token: {}", e),
+            )
+        })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Deserialize)]

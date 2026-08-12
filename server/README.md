@@ -337,3 +337,18 @@ docker compose down -v
   "role": "admin"
 }
 ```
+
+### 9.Logout
+
+* **Endpoint:** `POST /auth/logout`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "refresh_token": "<YOUR REFRESH TOKEN>"
+}
+```
+#### 📤 Response Mẫu:
+
+* **Success (204 No Content):**
