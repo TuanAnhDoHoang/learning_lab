@@ -939,6 +939,8 @@ body {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 12px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ── Answer options ── */
@@ -947,6 +949,8 @@ body {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 28px;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .answer-option {
@@ -963,6 +967,8 @@ body {
   width: 100%;
   font-size: 1rem;
   color: var(--text-main);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .answer-option:hover {
@@ -3256,6 +3262,728 @@ body {
   display: flex;
   justify-content: center;
 }
+
+/* ==========================================================================
+   Offline Resilience & Network Notification Banners
+   ========================================================================== */
+
+.network-offline-banner {
+  background: #f59e0b;
+  color: #1e1e1e;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+  animation: slideDownBanner 0.3s ease;
+}
+
+.network-online-banner {
+  background: #22c55e;
+  color: #ffffff;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  animation: slideDownBanner 0.3s ease;
+}
+
+@keyframes slideDownBanner {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.exam-header-status-tags {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.offline-tag-indicator {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.offline-submission-alert {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1.5px solid rgba(245, 158, 11, 0.35);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 16px auto 20px;
+  max-width: 580px;
+  text-align: center;
+}
+
+.offline-submission-alert p {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+.btn-retry-sync {
+  background: #f59e0b;
+  color: #1e1e1e;
+  border: none;
+  font-size: 0.88rem;
+  font-weight: 800;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-retry-sync:hover {
+  background: #d97706;
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-retry-sync:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.exit-modal-actions-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-danger-exit {
+  background: var(--bg-surface-hover);
+  color: var(--text-muted);
+  border: 1.5px solid var(--border-color);
+  padding: 13px 20px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-danger-exit:hover {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+
+/* ==========================================================================
+   Host Role Selector (Room Lobby)
+   ========================================================================== */
+
+.host-role-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.role-select-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.role-select-card:hover {
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+}
+
+.role-select-card.selected {
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+  box-shadow: 0 0 0 1px var(--primary-color);
+}
+
+.role-card-radio input {
+  margin-top: 3px;
+  cursor: pointer;
+  accent-color: var(--primary-color);
+}
+
+.role-card-info strong {
+  display: block;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.role-card-info p {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.host-role-active-tag {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  background: var(--primary-light);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--primary-color);
+}
+
+/* ==========================================================================
+   Proctor Live Monitoring Dashboard
+   ========================================================================== */
+
+.proctor-dashboard-root {
+  min-height: 100vh;
+  background: var(--bg-primary);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+}
+
+.proctor-header-bar {
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.proctor-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.proctor-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.proctor-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: pulse 1.5s infinite;
+}
+
+.proctor-room-info h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.proctor-meta-tags {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.proctor-code-tag strong, .proctor-exam-tag strong {
+  color: var(--text-main);
+}
+
+.proctor-shield-tag {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.proctor-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.proctor-timer-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.p-timer-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+.p-timer-value {
+  font-family: 'SF Mono', Monaco, Consolas, monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--primary-color);
+}
+
+.proctor-timer-box.urgent .p-timer-value {
+  color: #ef4444;
+  animation: pulse 1s infinite;
+}
+
+.btn-end-proctor {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-end-proctor:hover {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.proctor-main-container {
+  padding: 24px 0 48px;
+  flex: 1;
+}
+
+/* KPI Stats */
+.proctor-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.proctor-stat-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.proctor-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-color);
+}
+
+.proctor-stat-card.selected {
+  border-color: var(--primary-color);
+  background: var(--primary-light);
+}
+
+.proctor-stat-card .stat-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  margin-bottom: 4px;
+}
+
+.proctor-stat-card .stat-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.text-green { color: #22c55e; }
+.text-orange { color: #f59e0b; }
+.text-red { color: #ef4444; }
+.text-blue { color: #3b82f6; }
+
+/* 2-Column Grid */
+.proctor-layout-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .proctor-layout-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.proctor-table-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 20px 24px;
+}
+
+.section-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.section-header-row h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.filter-pills {
+  display: flex;
+  gap: 6px;
+}
+
+.pill-btn {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pill-btn.active, .pill-btn:hover {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+}
+
+/* Candidate Table */
+.proctor-table-container {
+  overflow-x: auto;
+}
+
+.proctor-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.proctor-table th {
+  padding: 12px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  border-bottom: 2px solid var(--border-color);
+  text-transform: uppercase;
+}
+
+.proctor-table td {
+  padding: 14px;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.cand-info-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cand-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.cand-name-wrap strong {
+  display: block;
+  font-weight: 700;
+}
+
+.bonus-time-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.status-badge.live-active {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.pulse-green {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: pulse 1.5s infinite;
+}
+
+.status-badge.live-blurred {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.status-badge.live-offline {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.status-badge.live-submitted {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+}
+
+.status-badge.live-disqualified {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Progress bar in table */
+.progress-bar-wrap {
+  min-width: 110px;
+}
+
+.progress-bar-track {
+  height: 6px;
+  background: var(--border-color);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.progress-bar-fill.full {
+  background: #22c55e;
+}
+
+.progress-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.heartbeat-text {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+/* Proctor action buttons */
+.proctor-action-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-p-action {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-p-action.warn {
+  background: var(--bg-surface);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.btn-p-action.warn:hover {
+  background: #f59e0b;
+  color: #1e1e1e;
+}
+
+.btn-p-action.bonus {
+  background: var(--bg-surface);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.btn-p-action.bonus:hover {
+  background: #22c55e;
+  color: #fff;
+}
+
+.btn-p-action.kick {
+  background: var(--bg-surface);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.btn-p-action.kick:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+.btn-p-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Right Column: Live Activity Feed */
+.proctor-activity-aside {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 20px;
+}
+
+.activity-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.activity-card-header h3 {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.live-tag {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.activity-feed-list {
+  max-height: 480px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.activity-feed-item {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.activity-feed-item.type-info {
+  border-left-color: #3b82f6;
+}
+
+.activity-feed-item.type-warning {
+  border-left-color: #f59e0b;
+}
+
+.activity-feed-item.type-danger {
+  border-left-color: #ef4444;
+}
+
+.activity-feed-item.type-success {
+  border-left-color: #22c55e;
+}
+
+.feed-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.feed-candidate {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.feed-time {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.feed-msg {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: 0;
+}
+
+.proctor-warning-textarea {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+  margin-top: 10px;
+}
+
+.proctor-footer-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+
+
 
 
 

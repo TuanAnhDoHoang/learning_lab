@@ -12,7 +12,8 @@ import { ExamPage } from './exampage';
 import { LoginPage } from './loginpage';
 import { RegisterPage } from './registerpage';
 import { RoomPage } from './roompage';
-import { Exam, CustomExamData } from '..';
+import { ProctorDashboard } from './proctordashboard';
+import { Exam, CustomExamData, HostRoleMode } from '..';
 import { fetchExams, logoutUser, isAuthenticated } from '../api/apicaller';
 
 // Map domain_id to domain name (matches seed data)
@@ -35,6 +36,9 @@ interface ActiveExamSession {
   durationMinutes?: number;
   enableAntiCheat?: boolean;
   roomParticipants?: string[];
+  hostRole?: HostRoleMode;
+  roomCode?: string;
+  roomTitle?: string;
 }
 
 export const App: React.FC = () => {
@@ -144,6 +148,7 @@ export const App: React.FC = () => {
       examId: exam.id,
       examName: exam.name,
       customExamData: null,
+      hostRole: 'participant',
     });
   };
 
@@ -154,7 +159,8 @@ export const App: React.FC = () => {
     customExamData?: CustomExamData | null,
     durationMinutes?: number,
     enableAntiCheat?: boolean,
-    roomParticipants?: string[]
+    roomParticipants?: string[],
+    hostRole: HostRoleMode = 'participant'
   ) => {
     setTakingExamSession({
       examId,
@@ -163,11 +169,31 @@ export const App: React.FC = () => {
       durationMinutes,
       enableAntiCheat,
       roomParticipants,
+      hostRole,
+      roomCode: 'LT-8492',
+      roomTitle: `Phòng thi: ${examName}`,
     });
   };
 
-  // If taking an exam, render ExamPage
+  // If taking an exam or monitoring as Proctor
   if (takingExamSession) {
+    if (takingExamSession.hostRole === 'proctor') {
+      return (
+        <ProctorDashboard
+          roomCode={takingExamSession.roomCode || 'LT-8492'}
+          roomTitle={takingExamSession.roomTitle || `Phòng thi: ${takingExamSession.examName}`}
+          examName={takingExamSession.examName}
+          customExamData={takingExamSession.customExamData}
+          durationMinutes={takingExamSession.durationMinutes || 15}
+          enableAntiCheat={takingExamSession.enableAntiCheat ?? true}
+          participants={takingExamSession.roomParticipants || []}
+          currentUser={user}
+          onEndExam={() => setTakingExamSession(null)}
+          onBackToHome={() => setTakingExamSession(null)}
+        />
+      );
+    }
+
     return (
       <ExamPage
         examId={takingExamSession.examId}

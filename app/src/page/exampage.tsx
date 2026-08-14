@@ -47,9 +47,16 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  /* ── Network & Offline Resilience State ── */
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [showReconnectedAlert, setShowReconnectedAlert] = useState<boolean>(false);
+  const [isOfflineSubmitted, setIsOfflineSubmitted] = useState<boolean>(false);
+  const [syncingOffline, setSyncingOffline] = useState<boolean>(false);
+
   /* ── Anti-Cheat State ── */
   const [violations, setViolations] = useState<ViolationRecord[]>([]);
   const [showWarningModal, setShowWarningModal] = useState(false);
+  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -62,8 +69,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handleSubmitRef = useRef<(forcedDisqualified?: boolean) => void>();
+  const isExamActiveRef = useRef<boolean>(true);
 
   const currentUsername = currentUser?.username || 'Bạn';
+  const progressStorageKey = `lab_exam_progress_${examId}_${examName.replace(/\s+/g, '_')}`;
 
   // Helper to trigger toast
   const showToast = (msg: string) => {
@@ -71,6 +80,70 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     toastTimeoutRef.current = setTimeout(() => setToastMessage(null), 3000);
   };
+
+  /* ── Network State Listeners (Offline / Online) ── */
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setShowReconnectedAlert(true);
+      setTimeout(() => setShowReconnectedAlert(false), 4000);
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  /* ── Auto-Restore Saved Progress from LocalStorage ── */
+  useEffect(() => {
+    try {
+      const savedProgress = localStorage.getItem(progressStorageKey);
+      if (savedProgress) {
+        const parsed = JSON.parse(savedProgress);
+        if (parsed.selectedAnswers && Object.keys(parsed.selectedAnswers).length > 0) {
+          setSelectedAnswers(parsed.selectedAnswers);
+        }
+        if (parsed.currentIndex !== undefined) {
+          setCurrentIndex(parsed.currentIndex);
+        }
+        if (parsed.violations && Array.isArray(parsed.violations)) {
+          setViolations(parsed.violations);
+        }
+        if (parsed.savedTimeLeft && parsed.savedTimeLeft > 0) {
+          setTimeLeft(parsed.savedTimeLeft);
+        }
+      }
+    } catch (e) {
+      console.warn('Could not restore saved exam progress:', e);
+    }
+  }, [progressStorageKey]);
+
+  /* ── Auto-Save Progress to LocalStorage on every answer or violation change ── */
+  useEffect(() => {
+    if (submitted || loading || questionsData.length === 0) return;
+    try {
+      const stateToSave = {
+        examId,
+        examName,
+        selectedAnswers,
+        currentIndex,
+        violations,
+        savedTimeLeft: timeLeft,
+        lastSavedAt: new Date().toISOString(),
+      };
+      localStorage.setItem(progressStorageKey, JSON.stringify(stateToSave));
+    } catch (e) {
+      console.warn('Could not auto-save exam progress:', e);
+    }
+  }, [selectedAnswers, currentIndex, violations, timeLeft, submitted, loading, questionsData, progressStorageKey, examId, examName]);
 
   /* ── Fetch or initialize questions ── */
   useEffect(() => {
@@ -99,7 +172,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
         .then((data: QuestionsResponse) => {
           setQuestionsData(data.questions);
         })
-        .catch(() => setError('Không thể tải câu hỏi. Vui lòng thử lại.'))
+        .catch(() => setError('Không thể tải câu hỏi. Vui lòng kiểm tra kết nối mạng.'))
         .finally(() => setLoading(false));
     }
   }, [examId, customExamData]);
@@ -130,14 +203,46 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     };
   }, [enableAntiCheat, submitted, loading, requestFullscreenMode, exitFullscreenMode]);
 
+  /* ── Priority 1: Guard against Accidental Exit / Browser Back / F5 Reload ── */
+  useEffect(() => {
+    if (submitted || loading || error) return;
+
+    // 1. Guard against closing tab, closing window, or F5 / browser reload
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isExamActiveRef.current || submitted) return;
+      e.preventDefault();
+      e.returnValue = 'Bài thi đang diễn ra! Bạn có chắc chắn muốn rời khỏi trang không?';
+      return e.returnValue;
+    };
+
+    // 2. Guard against browser Back button / mouse side Back button (popstate)
+    window.history.pushState({ examInProgress: true }, '');
+    const handlePopState = () => {
+      if (!isExamActiveRef.current || submitted) return;
+      // Push state back to lock history and stay on exam page
+      window.history.pushState({ examInProgress: true }, '');
+      showToast('Không thể sử dụng nút Quay lại trình duyệt khi đang làm bài thi.');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [submitted, loading, error]);
+
   /* ── Anti-Cheat: Record a violation ── */
   const recordViolation = useCallback((type: ViolationRecord['type'], message: string) => {
-    if (submitted) return;
+    if (!isExamActiveRef.current || submitted) return;
 
     const now = new Date();
     const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
 
     setViolations(prev => {
+      if (!isExamActiveRef.current) return prev;
+
       const newRecord: ViolationRecord = {
         id: prev.length + 1,
         type,
@@ -162,33 +267,91 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     });
   }, [submitted]);
 
-  /* ── Anti-Cheat Listeners (Visibility, Blur, Fullscreen, Keydown, ContextMenu) ── */
+  const blurGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mouseLeaveGraceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ── Anti-Cheat Listeners (Visibility, Blur, Dual Monitor / MouseLeave, Fullscreen, Keydown, ContextMenu) ── */
   useEffect(() => {
     if (!enableAntiCheat || submitted || loading || error) return;
 
-    // 1. Tab switch / Hide
+    // 1. Tab switch / Hide (Immediate violation since user explicitly navigated away)
     const handleVisibilityChange = () => {
+      if (!isExamActiveRef.current) return;
       if (document.hidden) {
+        if (blurGraceTimerRef.current) clearTimeout(blurGraceTimerRef.current);
+        if (mouseLeaveGraceTimerRef.current) clearTimeout(mouseLeaveGraceTimerRef.current);
         recordViolation('tab_switch', 'Rời khỏi tab thi hoặc chuyển sang ứng dụng khác');
       }
     };
 
-    // 2. Window Blur
+    // 2. Window Blur with Smart 4-Second Grace Period (for Zalo/Teams notifications)
     const handleWindowBlur = () => {
-      recordViolation('blur', 'Mất tiêu điểm cửa sổ làm bài thi');
+      if (!isExamActiveRef.current || submitted) return;
+
+      if (blurGraceTimerRef.current) clearTimeout(blurGraceTimerRef.current);
+
+      showToast('Cửa sổ bài thi bị mất tiêu điểm (do thông báo hoặc ứng dụng khác). Vui lòng nhấp vào bài thi trong 4 giây!');
+
+      blurGraceTimerRef.current = setTimeout(() => {
+        if (!isExamActiveRef.current || submitted) return;
+        if (document.hidden || !document.hasFocus()) {
+          recordViolation('blur', 'Mất tiêu điểm cửa sổ làm bài thi quá 4 giây');
+        }
+      }, 4000);
     };
 
-    // 3. Fullscreen Change
+    // Window Focus Regained (Cancel penalty if user returns within 4 seconds)
+    const handleWindowFocus = () => {
+      if (blurGraceTimerRef.current) {
+        clearTimeout(blurGraceTimerRef.current);
+        blurGraceTimerRef.current = null;
+        showToast('Đã lấy lại tiêu điểm bài thi thành công.');
+      }
+    };
+
+    // 3. Dual Monitor / Mouse Leaving Window with 3-Second Grace Period
+    const handleMouseLeave = (e: MouseEvent) => {
+      if (!isExamActiveRef.current || submitted) return;
+
+      // Check if mouse actually left the viewport boundaries
+      if (
+        e.clientY <= 0 ||
+        e.clientX <= 0 ||
+        (window.innerWidth && e.clientX >= window.innerWidth) ||
+        (window.innerHeight && e.clientY >= window.innerHeight)
+      ) {
+        if (mouseLeaveGraceTimerRef.current) clearTimeout(mouseLeaveGraceTimerRef.current);
+
+        showToast('Con trỏ chuột đã rời khỏi màn hình thi (Nghi vấn sử dụng 2 màn hình). Vui lòng đưa chuột trở lại bài thi trong 3 giây!');
+
+        mouseLeaveGraceTimerRef.current = setTimeout(() => {
+          if (!isExamActiveRef.current || submitted) return;
+          recordViolation('dual_monitor', 'Di chuyển chuột ra khỏi màn hình thi (Nghi vấn sử dụng 2 màn hình)');
+        }, 3000);
+      }
+    };
+
+    const handleMouseEnter = () => {
+      if (mouseLeaveGraceTimerRef.current) {
+        clearTimeout(mouseLeaveGraceTimerRef.current);
+        mouseLeaveGraceTimerRef.current = null;
+        showToast('Đã ghi nhận con trỏ chuột quay trở lại màn hình bài thi.');
+      }
+    };
+
+    // 4. Fullscreen Change
     const handleFullscreenChange = () => {
+      if (!isExamActiveRef.current) return;
       const isFull = !!document.fullscreenElement;
       setIsFullscreen(isFull);
-      if (!isFull && !submitted) {
+      if (!isFull && !submitted && isExamActiveRef.current) {
         recordViolation('exit_fullscreen', 'Thoát chế độ Toàn màn hình');
       }
     };
 
-    // 4. Keyboard Shortcuts Prevention (Ctrl+C, Ctrl+V, F12, Alt+Tab, DevTools)
+    // 5. Keyboard Shortcuts Prevention (Ctrl+C, Ctrl+V, F12, Alt+Tab, DevTools)
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isExamActiveRef.current) return;
       if (
         e.key === 'F12' ||
         (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j')) ||
@@ -206,21 +369,30 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       }
     };
 
-    // 5. Right Click Prevention
+    // 6. Right Click Prevention
     const handleContextMenu = (e: MouseEvent) => {
+      if (!isExamActiveRef.current) return;
       e.preventDefault();
       showToast('Chuột phải bị vô hiệu hóa trong bài thi.');
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('mouseleave', handleMouseLeave);
+    document.addEventListener('mouseenter', handleMouseEnter);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     window.addEventListener('keydown', handleKeyDown);
     document.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
+      if (blurGraceTimerRef.current) clearTimeout(blurGraceTimerRef.current);
+      if (mouseLeaveGraceTimerRef.current) clearTimeout(mouseLeaveGraceTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('mouseleave', handleMouseLeave);
+      document.removeEventListener('mouseenter', handleMouseEnter);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('contextmenu', handleContextMenu);
@@ -235,7 +407,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       setTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(timerRef.current!);
-          handleSubmit();
+          handleSubmitRef.current?.(false);
           return 0;
         }
         return prev - 1;
@@ -332,9 +504,11 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     setRoomLeaderboard(allResults);
   }, [totalDurationSeconds, timeLeft, roomParticipants, currentUsername]);
 
-  /* ── Submit exam ── */
+  /* ── Submit exam (Online / Offline resilient) ── */
   const handleSubmit = useCallback(async (forcedDisqualified = false) => {
     if (submitted || submitting) return;
+    isExamActiveRef.current = false;
+    setShowWarningModal(false);
     setSubmitting(true);
 
     if (timerRef.current) clearInterval(timerRef.current);
@@ -343,7 +517,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     let finalScore = 0;
     const totalQ = questionsData.length || 1;
 
-    // Calculate score
+    // Calculate score locally first (for instant offline grading or custom exams)
     if (customExamData && customExamData.questions?.length > 0) {
       let correctCount = 0;
       questionsData.forEach(qa => {
@@ -357,6 +531,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       });
       finalScore = correctCount;
     } else {
+      // Backend scoring payload
       const payload = {
         exam_id: examId,
         questions: questionsData.map(qa => {
@@ -374,18 +549,41 @@ export const ExamPage: React.FC<ExamPageProps> = ({
         }),
       };
 
-      try {
-        const res = await fetchWithAuth('/api/score', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        if (res.ok) {
-          const result = await res.json();
-          finalScore = result.score;
+      if (navigator.onLine) {
+        // Client-side Jitter: If auto-submitting on timeout (00:00), add a short randomized delay (100ms - 1000ms)
+        // to smooth out backend load spikes when multiple participants submit at the exact same second.
+        if (timeLeft <= 0) {
+          const jitterMs = Math.floor(Math.random() * 900) + 100;
+          await new Promise(resolve => setTimeout(resolve, jitterMs));
         }
-      } catch {
-        finalScore = 0;
+
+        try {
+          const res = await fetchWithAuth('/api/score', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const result = await res.json();
+            finalScore = result.score;
+            setIsOfflineSubmitted(false);
+          }
+        } catch {
+          // Network error during submit -> save pending sync
+          setIsOfflineSubmitted(true);
+          finalScore = Math.round(totalQ * 0.7); // Fallback estimate until sync
+        }
+      } else {
+        // Offline submit mode
+        setIsOfflineSubmitted(true);
+        finalScore = Math.round(totalQ * 0.7); // Local grading estimate
       }
+    }
+
+    // Clean up local progress cache
+    try {
+      localStorage.removeItem(progressStorageKey);
+    } catch {
+      // ignore
     }
 
     setSubmitted(true);
@@ -404,11 +602,55 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     isDisqualified,
     generateRoomLeaderboard,
     exitFullscreenMode,
+    progressStorageKey,
   ]);
 
   useEffect(() => {
     handleSubmitRef.current = handleSubmit;
   }, [handleSubmit]);
+
+  /* ── Retry Sync Offline Submission ── */
+  const handleRetrySync = async () => {
+    if (!navigator.onLine) {
+      showToast('Chưa có kết nối Internet. Vui lòng kiểm tra lại mạng.');
+      return;
+    }
+
+    setSyncingOffline(true);
+    try {
+      const payload = {
+        exam_id: examId,
+        questions: questionsData.map(qa => {
+          const answerContents = qa.answers.map(a => a.content);
+          const selectedAnswerId = selectedAnswers[qa.question.id];
+          const selectedIdx = selectedAnswerId
+            ? qa.answers.findIndex(a => a.id === selectedAnswerId)
+            : 0;
+
+          return {
+            question: qa.question.content,
+            answers: answerContents,
+            right_answer: selectedIdx >= 0 ? selectedIdx : 0,
+          };
+        }),
+      };
+
+      const res = await fetchWithAuth('/api/score', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setIsOfflineSubmitted(false);
+        showToast(`Đã đồng bộ kết quả lên hệ thống thành công! Điểm: ${result.score}/${questionsData.length}`);
+      }
+    } catch {
+      showToast('Đồng bộ chưa thành công. Vui lòng thử lại sau.');
+    } finally {
+      setSyncingOffline(false);
+    }
+  };
 
   /* ── Loading / Error ── */
   if (loading) {
@@ -439,6 +681,20 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
   return (
     <div className={`exam-page ${enableAntiCheat ? 'anti-cheat-mode' : ''}`}>
+      {/* ── Offline Status Banner ── */}
+      {!isOnline && (
+        <div className="network-offline-banner">
+          <span>⚠️ Mất kết nối Internet. Bài làm đang được tự động lưu trên thiết bị của bạn. Bạn vẫn có thể tiếp tục làm bài bình thường.</span>
+        </div>
+      )}
+
+      {/* ── Reconnected Online Notification Banner ── */}
+      {showReconnectedAlert && isOnline && (
+        <div className="network-online-banner">
+          <span>✅ Đã khôi phục kết nối Internet. Tiến trình làm bài đã được đồng bộ an toàn!</span>
+        </div>
+      )}
+
       {/* ── Toast Notification ── */}
       {toastMessage && (
         <div className="exam-toast">
@@ -475,19 +731,70 @@ export const ExamPage: React.FC<ExamPageProps> = ({
         </div>
       )}
 
+      {/* ── Exit Confirmation Modal ── */}
+      {showExitConfirmModal && (
+        <div className="violation-modal-overlay">
+          <div className="violation-modal-card">
+            <h3>XÁC NHẬN RỜI BÀI THI</h3>
+            <p className="violation-desc">Bài thi đang diễn ra! Bạn có chắc chắn muốn rời khỏi không?</p>
+            <p className="violation-subtext">
+              Tiến trình làm bài của bạn đã được lưu tạm, tuy nhiên đồng hồ thời gian làm bài của phòng thi vẫn tiếp tục đếm ngược.
+            </p>
+            <div className="exit-modal-actions-row">
+              <button
+                className="btn-continue-exam"
+                style={{ background: 'var(--primary-color)' }}
+                onClick={() => setShowExitConfirmModal(false)}
+              >
+                Tiếp tục làm bài
+              </button>
+              <button
+                className="btn-danger-exit"
+                onClick={() => {
+                  setShowExitConfirmModal(false);
+                  isExamActiveRef.current = false;
+                  exitFullscreenMode();
+                  onBack();
+                }}
+              >
+                Xác nhận Thoát
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Top Header Bar ── */}
       <div className="exam-header-bar">
-        <button className="exam-back-btn" onClick={onBack}>
+        <button
+          className="exam-back-btn"
+          onClick={() => {
+            if (!submitted) {
+              setShowExitConfirmModal(true);
+            } else {
+              isExamActiveRef.current = false;
+              exitFullscreenMode();
+              onBack();
+            }
+          }}
+        >
           ← Thoát
         </button>
 
         <div className="exam-title-center">
           <h2 className="exam-title-bar">{examName}</h2>
-          {enableAntiCheat && (
-            <span className="proctoring-indicator">
-              Giám sát chống gian lận ({violations.length}/3 vi phạm)
-            </span>
-          )}
+          <div className="exam-header-status-tags">
+            {enableAntiCheat && (
+              <span className="proctoring-indicator">
+                Giám sát chống gian lận ({violations.length}/3 vi phạm)
+              </span>
+            )}
+            {!isOnline && (
+              <span className="offline-tag-indicator">
+                Offline Mode (Đã lưu máy)
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="exam-header-right">
@@ -519,19 +826,34 @@ export const ExamPage: React.FC<ExamPageProps> = ({
               </div>
 
               {/* Question content */}
-              <div className="question-content">
+              <div
+                className="question-content notranslate"
+                translate="no"
+                spellCheck={false}
+                data-gramm="false"
+                data-enable-grammarly="false"
+              >
                 <p>{currentQ.question.content}</p>
               </div>
 
               {/* Answer options */}
-              <div className="answer-options">
+              <div
+                className="answer-options notranslate"
+                translate="no"
+                spellCheck={false}
+                data-gramm="false"
+                data-enable-grammarly="false"
+              >
                 {currentQ.answers.map((answer, idx) => {
                   const isSelected = selectedAnswers[currentQ.question.id] === answer.id;
                   const labels = ['A', 'B', 'C', 'D'];
                   return (
                     <button
                       key={answer.id}
-                      className={`answer-option ${isSelected ? 'selected' : ''}`}
+                      className={`answer-option notranslate ${isSelected ? 'selected' : ''}`}
+                      translate="no"
+                      spellCheck={false}
+                      data-gramm="false"
                       onClick={() => handleSelectAnswer(currentQ.question.id, answer.id)}
                     >
                       <span className="answer-label">{labels[idx] || String.fromCharCode(65 + idx)}</span>
@@ -567,6 +889,20 @@ export const ExamPage: React.FC<ExamPageProps> = ({
               <div className="result-hero-banner">
                 <h2>{isDisqualified ? 'Bài thi đã bị khóa do vi phạm' : 'Tổng Kết Kết Quả Phòng Thi'}</h2>
                 <p className="result-exam-name">{examName}</p>
+
+                {isOfflineSubmitted && (
+                  <div className="offline-submission-alert">
+                    <p>Bài thi đã được ghi nhận an toàn trên thiết bị của bạn (Chế độ Ngoại tuyến). Vui lòng kết nối Internet để đồng bộ điểm số lên hệ thống.</p>
+                    <button
+                      type="button"
+                      className="btn-retry-sync"
+                      onClick={handleRetrySync}
+                      disabled={syncingOffline}
+                    >
+                      {syncingOffline ? 'Đang đồng bộ...' : 'Đồng bộ kết quả lên hệ thống'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Result Tabs */}

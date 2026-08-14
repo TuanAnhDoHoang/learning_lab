@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Exam, CustomExamData, CustomQuestion } from '..';
+import { Exam, CustomExamData, CustomQuestion, HostRoleMode } from '..';
 import { fetchExams } from '../api/apicaller';
 
 interface RoomPageProps {
@@ -10,7 +10,8 @@ interface RoomPageProps {
     customExamData?: CustomExamData | null,
     durationMinutes?: number,
     enableAntiCheat?: boolean,
-    roomParticipants?: string[]
+    roomParticipants?: string[],
+    hostRole?: HostRoleMode
   ) => void;
   onBackToHome: () => void;
 }
@@ -28,6 +29,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
   const [durationMinutes, setDurationMinutes] = useState<number>(15);
   const [customDurationInput, setCustomDurationInput] = useState<string>('15');
   const [enableAntiCheat, setEnableAntiCheat] = useState<boolean>(true);
+  const [hostRole, setHostRole] = useState<HostRoleMode>('participant');
 
   /* ── Form State for Creating / Joining ── */
   const [newRoomTitle, setNewRoomTitle] = useState('');
@@ -94,7 +96,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
     setRoomCode(code);
     setRoomTitle(title);
     setIsHost(true);
-    setParticipants([username, 'Nguyễn Văn A (Demo)', 'Trần Thị B (Demo)']);
+    setParticipants([username, 'Nguyễn Văn A', 'Trần Thị B', 'Lê Hoàng C', 'Phạm Minh D']);
     setInRoom(true);
   };
 
@@ -224,9 +226,9 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
   const handleStartExamClick = () => {
     const finalDuration = Math.max(1, durationMinutes || 15);
     if (appliedCustomExam) {
-      onStartExam(0, appliedCustomExam.name, appliedCustomExam, finalDuration, enableAntiCheat, participants);
+      onStartExam(0, appliedCustomExam.name, appliedCustomExam, finalDuration, enableAntiCheat, participants, hostRole);
     } else if (selectedExistingExam) {
-      onStartExam(selectedExistingExam.id, selectedExistingExam.name, null, finalDuration, enableAntiCheat, participants);
+      onStartExam(selectedExistingExam.id, selectedExistingExam.name, null, finalDuration, enableAntiCheat, participants, hostRole);
     }
   };
 
@@ -251,7 +253,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
                 Phòng Thi <span className="text-gradient">Trực Tuyến</span>
               </h1>
               <p className="room-main-subtitle">
-                Tạo phòng thi riêng để thách đấu và cùng làm bài với bạn bè trong thời gian thực.
+                Tạo phòng thi riêng để thách đấu cùng bạn bè hoặc tổ chức kỳ thi giám sát trực tuyến.
               </p>
             </div>
 
@@ -265,7 +267,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
               {/* Card 1: Tạo phòng thi */}
               <div className="room-card create-card">
                 <h3>Tạo phòng thi mới</h3>
-                <p>Tạo phòng thi riêng, chọn đề hoặc tự tạo câu hỏi và mời bạn bè tham gia.</p>
+                <p>Tạo phòng thi riêng, chọn đề hoặc tự tạo câu hỏi và mời thí sinh tham gia.</p>
 
                 <form onSubmit={handleCreateRoom} className="room-form">
                   <div className="room-input-group">
@@ -328,7 +330,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
         <div className="lobby-header-card">
           <div className="lobby-header-left">
             <span className={`role-badge ${isHost ? 'host' : 'member'}`}>
-              {isHost ? 'Chủ phòng (Host)' : 'Thành viên'}
+              {isHost ? `Chủ phòng (${hostRole === 'proctor' ? 'Giám thị' : 'Thí sinh'})` : 'Thành viên'}
             </span>
             <h2 className="lobby-room-title">{roomTitle}</h2>
             <p className="lobby-host-info">Tạo bởi: <strong>{isHost ? username : 'Chủ phòng'}</strong></p>
@@ -370,6 +372,11 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
                   <strong>{currentExamDisplayName}</strong>
                   <span>Thời gian: <strong>{durationMinutes} phút</strong></span>
                   {enableAntiCheat && <span className="anticheat-active-tag">Giám sát chống gian lận: BẬT</span>}
+                  {isHost && (
+                    <span className="host-role-active-tag">
+                      Vai trò: <strong>{hostRole === 'proctor' ? 'Giám thị (Giám sát Live)' : 'Cùng làm bài thi'}</strong>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -381,7 +388,9 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
                     onClick={handleStartExamClick}
                     disabled={!selectedExistingExam && !appliedCustomExam}
                   >
-                    Bắt đầu làm bài thi ({durationMinutes}p)
+                    {hostRole === 'proctor'
+                      ? `Mở Bảng Giám Sát Phòng Thi (${durationMinutes}p)`
+                      : `Bắt đầu làm bài thi (${durationMinutes}p)`}
                   </button>
                 ) : (
                   <div className="waiting-status-box">
@@ -414,12 +423,55 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
             {isHost ? (
               <div className="lobby-card exam-config-card">
                 <div className="config-card-header">
-                  <h3>Cấu hình đề thi & Thời gian</h3>
-                  <p>Chọn đề thi, tùy chỉnh thời gian làm bài và thiết lập chế độ giám sát chống gian lận.</p>
+                  <h3>Cấu hình đề thi & Vai trò Chủ phòng</h3>
+                  <p>Chọn đề thi, tùy chỉnh thời gian làm bài và thiết lập vai trò thi đấu hoặc giám thị.</p>
                 </div>
 
-                {/* Duration & Anti-Cheat Settings Block */}
+                {/* Duration, Host Role & Anti-Cheat Settings Block */}
                 <div className="room-settings-banner">
+                  {/* Host Role Selection */}
+                  <div className="setting-section">
+                    <label className="setting-label">Vai trò của Chủ phòng khi bắt đầu thi:</label>
+                    <div className="host-role-selector-grid">
+                      <div
+                        className={`role-select-card ${hostRole === 'participant' ? 'selected' : ''}`}
+                        onClick={() => setHostRole('participant')}
+                      >
+                        <div className="role-card-radio">
+                          <input
+                            type="radio"
+                            name="hostRole"
+                            checked={hostRole === 'participant'}
+                            onChange={() => setHostRole('participant')}
+                          />
+                        </div>
+                        <div className="role-card-info">
+                          <strong>Cùng tham gia làm bài thi</strong>
+                          <p>Chủ phòng tham gia làm bài, tính giờ và xếp hạng điểm cùng các thí sinh khác.</p>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`role-select-card ${hostRole === 'proctor' ? 'selected' : ''}`}
+                        onClick={() => setHostRole('proctor')}
+                      >
+                        <div className="role-card-radio">
+                          <input
+                            type="radio"
+                            name="hostRole"
+                            checked={hostRole === 'proctor'}
+                            onChange={() => setHostRole('proctor')}
+                          />
+                        </div>
+                        <div className="role-card-info">
+                          <strong>Chế độ Giám thị (Giáo viên giám sát)</strong>
+                          <p>Chủ phòng KHÔNG thi, mở Bảng giám sát thời gian thực để theo dõi tiến độ, phát hiện mất mạng và bắt vi phạm gian lận.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Duration Presets */}
                   <div className="setting-section">
                     <label className="setting-label">Thời gian làm bài thi:</label>
                     <div className="duration-presets-grid">
@@ -458,6 +510,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
                     </div>
                   </div>
 
+                  {/* Anti-cheat Proctoring Mode Toggle */}
                   <div className="setting-section anticheat-toggle-section">
                     <label className="anticheat-checkbox-label">
                       <input
@@ -467,9 +520,15 @@ export const RoomPage: React.FC<RoomPageProps> = ({ currentUser, onStartExam, on
                       />
                       <div className="anticheat-label-text">
                         <strong>Bật Giám sát Chống gian lận (Proctoring Mode)</strong>
-                        <p>Tự động phóng to Toàn màn hình khi thi, phát hiện chuyển tab / rời màn hình, chặn chuột phải và ghi lại số lần vi phạm.</p>
+                        <p>Tự động phóng to Toàn màn hình khi thi, phát hiện chuyển tab / rời màn hình, chặn chuột phải, tích hợp thời gian ân hạn 4s chống bắt nhầm thông báo.</p>
                       </div>
                     </label>
+
+                    {enableAntiCheat && (
+                      <div className="focus-assist-tip-box" style={{ marginTop: '12px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.25)', borderRadius: '10px', padding: '12px 16px', fontSize: '0.84rem', color: 'var(--text-main)', lineHeight: '1.4' }}>
+                        <strong>Khuyến nghị trước khi thi:</strong> Hãy bật chế độ <em>Không làm phiền (Focus Assist - Win+N)</em> và tắt các ứng dụng chat (Zalo, Teams, Discord) để tránh thông báo làm gián đoạn bài làm.
+                      </div>
+                    )}
                   </div>
                 </div>
 
