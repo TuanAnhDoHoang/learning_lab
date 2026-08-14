@@ -162,12 +162,12 @@ pub async fn login(
     let cookie = jar
         .add(default_cookie(
             "access_token",
-            access_token,
+            access_token.clone(),
             access_max_age_hours,
         ))
         .add(default_cookie(
             "refesh_token",
-            refesh_token,
+            refesh_token.clone(),
             refesh_max_age_hours,
         ));
 
@@ -175,6 +175,8 @@ pub async fn login(
         email: user.email,
         userid: user.id,
         username: user.name,
+        access_token: access_token,
+        refresh_token: refesh_token
     };
     Ok((cookie, Json(login_response)))
 }

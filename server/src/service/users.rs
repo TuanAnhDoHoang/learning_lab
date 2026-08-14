@@ -104,6 +104,8 @@ pub struct LoginResponse {
     pub userid: i32,
     pub username: String,
     pub email: String,
+    pub refresh_token: String,
+    pub access_token: String
 }
 
 pub fn find_user_by_email(email: &str, conn: &mut PgConnection) -> anyhow::Result<Users>{
