@@ -8,15 +8,12 @@ services:
     restart: unless-stopped
     ports:
       - "5432:5432"
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-learninglab}
-      POSTGRES_DB: ${POSTGRES_DB:-learning_lab}
-      PGDATA: /var/lib/postgresql/data/pgdata
+    env_file:
+      - ./server/.env
     volumes:
       - pgdata:/var/lib/postgresql/data/pgdata
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -33,14 +30,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    env_file:
+      - ./server/.env
     environment:
-      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-learninglab}@db:5432/${POSTGRES_DB:-learning_lab}"
+      DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
       URL: "0.0.0.0:3000"
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-learninglab}
-      POSTGRES_DB: ${POSTGRES_DB:-learning_lab}
-      SECRET: ${SECRET:-"SECRETVCL"}
-      ADMIN_ROUTE: ${ADMIN_ROUTE:-scibidiviemkhongyeuduoi}
       RUST_LOG: info
 
   # Frontend Web App + Nginx Reverse Proxy
