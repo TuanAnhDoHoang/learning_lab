@@ -70,7 +70,7 @@ export const Sidebar: React.FC = () => {
 
       {/* Featured Stats Widget */}
       <div className="widget stats-widget">
-        <h4 className="widget-subtitle">🔥 Đề thi nổi bật hôm nay</h4>
+        <h4 className="widget-subtitle">Đề thi nổi bật hôm nay</h4>
         <ul className="trending-list">
           {featuredExams.map((exam, index) => (
             <li key={exam.id}>
