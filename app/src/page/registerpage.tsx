@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { registerUser } from '../api/apicaller';
 
 interface RegisterPageProps {
   onRegisterSuccess: () => void;
@@ -14,7 +15,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -29,16 +30,23 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
     }
 
     if (password.length < 9) {
-      setError('Mật khẩu phải có ít nhất 9 ký tự.');
+      setError('Mật khẩu phải có ít nhất 9 ký tự (bao gồm chữ hoa, chữ thường, số và ký tự đặc biệt).');
       return;
     }
 
-    // TODO: Gọi API register ở đây
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      await registerUser({
+        email: email.trim(),
+        username: username.trim(),
+        password: password.trim(),
+      });
       onRegisterSuccess();
-    }, 800);
+    } catch (err: any) {
+      setError(err.message || 'Đăng ký thất bại. Vui lòng kiểm tra thông tin.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /* Password strength indicator */

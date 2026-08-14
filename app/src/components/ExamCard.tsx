@@ -22,7 +22,7 @@ export const ExamCard: React.FC<ExamCardProps> = ({ exam, onOpenDetail }) => {
         <h3 className="card-title">{exam.name}</h3>
         <div className="card-meta-list">
           <div className="meta-row">
-            <span>📚 {domainName}</span>
+            <span>{domainName}</span>
           </div>
         </div>
         <div className="card-tags">

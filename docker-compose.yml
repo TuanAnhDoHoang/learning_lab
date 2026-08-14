@@ -1,0 +1,59 @@
+version: "3.8"
+
+services:
+  # Database PostgreSQL
+  db:
+    image: postgres:16-alpine
+    container_name: learning_lab_db
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-learninglab}
+      POSTGRES_DB: ${POSTGRES_DB:-learning_lab}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data/pgdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend API Server (Rust)
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: learning_lab_server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-learninglab}@db:5432/${POSTGRES_DB:-learning_lab}"
+      URL: "0.0.0.0:3000"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-learninglab}
+      POSTGRES_DB: ${POSTGRES_DB:-learning_lab}
+      SECRET: ${SECRET:-"SECRETVCL"}
+      ADMIN_ROUTE: ${ADMIN_ROUTE:-scibidiviemkhongyeuduoi}
+      RUST_LOG: info
+
+  # Frontend Web App + Nginx Reverse Proxy
+  app:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: learning_lab_app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - server
+
+volumes:
+  pgdata: {}

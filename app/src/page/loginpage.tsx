@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { loginUser } from '../api/apicaller';
 
 interface LoginPageProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (userData?: { userid: number; username: string; email: string }) => void;
   onGoToRegister: () => void;
 }
 
@@ -12,7 +13,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToRegi
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -21,12 +22,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToRegi
       return;
     }
 
-    // TODO: Gọi API login ở đây
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const user = await loginUser({ email: email.trim(), password: password.trim() });
+      onLoginSuccess(user);
+    } catch (err: any) {
+      setError(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra thông tin.');
+    } finally {
       setLoading(false);
-      onLoginSuccess();
-    }, 800);
+    }
   };
 
   return (
