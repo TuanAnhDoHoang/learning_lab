@@ -175,8 +175,8 @@ pub async fn login(
         email: user.email,
         userid: user.id,
         username: user.name,
-        access_token: access_token,
-        refresh_token: refesh_token
+        access_token,
+        refresh_token: refesh_token,
     };
     Ok((cookie, Json(login_response)))
 }

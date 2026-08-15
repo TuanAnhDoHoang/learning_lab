@@ -30,14 +30,12 @@ export const ExamModal: React.FC<ExamModalProps> = ({ exam, onClose, onStartExam
         <div className="modal-body">
           <div className="modal-meta-grid">
             <div className="meta-item">
-              <span className="meta-icon">📚</span>
               <div>
                 <strong>Lĩnh vực</strong>
                 <p>{domainName}</p>
               </div>
             </div>
             <div className="meta-item">
-              <span className="meta-icon">🆔</span>
               <div>
                 <strong>Mã đề thi</strong>
                 <p>#{exam.id}</p>
