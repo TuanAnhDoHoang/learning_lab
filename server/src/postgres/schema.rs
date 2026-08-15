@@ -13,6 +13,7 @@ pub struct Exam {
     pub id: i32,
     pub domain_id: i32,
     pub name: String,
+    pub duration: i32
 }
 
 #[derive(Debug, Queryable, Serialize)]

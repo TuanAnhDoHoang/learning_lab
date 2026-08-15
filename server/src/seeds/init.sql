@@ -17,13 +17,13 @@ INSERT INTO domain (id, name) VALUES
 -- ---------------------------------------------------------
 -- 2. EXAM
 -- ---------------------------------------------------------
-INSERT INTO exam (id, domain_id, name) VALUES
-    (1, 1, 'Kiểm tra 15 phút - Đại số'),
-    (2, 1, 'Kiểm tra 15 phút - Hình học'),
-    (3, 2, 'Kiểm tra 15 phút - Cơ học'),
-    (4, 2, 'Kiểm tra 15 phút - Điện học'),
-    (5, 3, 'Kiểm tra 15 phút - Hóa vô cơ'),
-    (6, 3, 'Kiểm tra 15 phút - Hóa hữu cơ');
+INSERT INTO exam (id, domain_id, name, duration) VALUES
+    (1, 1, 'Kiểm tra 15 phút - Đại số', 15),
+    (2, 1, 'Kiểm tra 15 phút - Hình học', 15),
+    (3, 2, 'Kiểm tra 15 phút - Cơ học', 15),
+    (4, 2, 'Kiểm tra 15 phút - Điện học', 15),
+    (5, 3, 'Kiểm tra 15 phút - Hóa vô cơ', 15),
+    (6, 3, 'Kiểm tra 15 phút - Hóa hữu cơ', 15);
 
 -- ---------------------------------------------------------
 -- 3. QUESTION

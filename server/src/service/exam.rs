@@ -15,6 +15,7 @@ use serde::Serialize;
 pub struct NewExam {
     pub domain_id: i32,
     pub name: String,
+    pub duration: i32
 }
 
 #[derive(Deserialize)]
@@ -22,6 +23,7 @@ pub struct CreateExamRequest {
     pub exam_name: String,
     pub domain: String,
     pub questions: Vec<QuestionRequest>,
+    pub duration: i32
 }
 
 #[derive(Serialize)]
@@ -29,10 +31,11 @@ pub struct CreateExamResponse {
     pub exam_id: i32,
 }
 
-pub fn new_exam(domain_id: i32, exam_name: &str, conn: &mut PgConnection) -> anyhow::Result<Exam> {
+pub fn new_exam(domain_id: i32, exam_name: &str, test_duration: i32, conn: &mut PgConnection) -> anyhow::Result<Exam> {
     let new_exam: NewExam = NewExam {
         domain_id,
         name: exam_name.to_string(),
+        duration: test_duration
     };
     let inserted_exam: Exam = diesel::insert_into(exam::table)
         .values(&new_exam)

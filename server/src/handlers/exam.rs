@@ -31,12 +31,12 @@ pub async fn create_new_exam(
         ROLE::ADMIN => true,
         _ => false,
     };
-    
-    if !check_user_role{
+
+    if !check_user_role {
         return Err((
             StatusCode::INTERNAL_SERVER_ERROR,
             "You have no permission".to_string(),
-        ))
+        ));
     }
 
     let mut new_exam_id = 0;
@@ -62,11 +62,12 @@ pub async fn create_new_exam(
             }
         };
 
-        let created_exam = new_exam(domain_id, &payload.exam_name, conn).map_err(|e| {
-            diesel::result::Error::QueryBuilderError(
-                format!("Error during create new exam {}", e).into(),
-            )
-        })?;
+        let created_exam = new_exam(domain_id, &payload.exam_name, payload.duration, conn)
+            .map_err(|e| {
+                diesel::result::Error::QueryBuilderError(
+                    format!("Error during create new exam {}", e).into(),
+                )
+            })?;
 
         for question in &payload.questions {
             let created_question = new_question(created_exam.id, question.question.as_str(), conn)

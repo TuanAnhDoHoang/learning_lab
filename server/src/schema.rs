@@ -34,6 +34,7 @@ diesel::table! {
         id -> Int4,
         domain_id -> Int4,
         name -> Text,
+        duration -> Int4,
     }
 }
 

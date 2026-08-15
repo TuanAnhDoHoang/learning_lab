@@ -59,6 +59,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/login", post(login))
         .route("/refresh", post(refresh));
 
+    let external_routes = Router::new().route("/exams", get(get_exams));
+
     let logout_routes =
         Router::new()
             .route("/logout", post(logout))
@@ -69,7 +71,6 @@ async fn main() -> anyhow::Result<()> {
 
     let api_routes = Router::new()
         .route("/new_exam", post(create_new_exam))
-        .route("/exams", get(get_exams))
         .route("/questions", get(get_question))
         .route("/score", post(handle_score))
         .layer(middleware::from_fn_with_state(
@@ -87,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
         .nest("/api", api_routes)
+        .nest("/api", external_routes)
         .nest(format!("/{}", admin_route).as_str(), admin_routes)
         .nest("/auth", auth_routes)
         .nest("/auth", logout_routes)
