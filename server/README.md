@@ -38,7 +38,72 @@ docker compose down -v
 
 ---
 
+## 🧪 Test End-to-End
+
+### 1. Chạy test route toàn diện
+
+```bash
+cargo test --test api -- --nocapture
+```
+
+Test này kiểm tra luồng nghiệp vụ thực tế của hệ thống từ lúc tạo admin, tạo bài thi, tạo phòng, người dùng tham gia phòng, bắt đầu làm bài, lưu đáp án, đóng phòng và kiểm tra các API điểm số.
+
+#### Luồng test được thực hiện
+- Đăng nhập admin
+- Tạo exam và room
+- Tạo 3 user test và join phòng
+- Bật trạng thái room đang diễn ra
+- Tạo `exam_attempt` cho từng user
+- Lấy `exam_content` từ response và trích xuất `question_id` / `answer_id`
+- Gửi đáp án theo từng câu hỏi
+- Gọi API kiểm tra room score và member score
+- Xóa room sau khi hoàn tất
+
+> Test này giúp validate các route chính theo hướng end-to-end, phù hợp để kiểm tra logic tích hợp giữa auth, exam, room và scoring.
+
+---
+
 ## 📡 API Reference
+
+### Tổng hợp các route hiện có
+
+#### 1) Authentication
+- `POST /auth/register` — đăng ký tài khoản mới
+- `POST /auth/login` — đăng nhập, trả về access token + refresh token + cookie
+- `POST /auth/refresh` — làm mới access/refresh token
+- `POST /auth/logout` — revoke refresh token hiện tại
+
+#### 2) Public / external
+- `GET /` — check server đang chạy (hello message)
+- `GET /api/exams` — lấy danh sách tất cả bài thi
+
+#### 3) Exam / question / score
+- `POST /api/new_exam` — tạo bài thi mới (chỉ admin)
+- `GET /api/questions?exam_id=<id>` — lấy danh sách câu hỏi và đáp án theo exam_id
+- `POST /api/score` — chấm điểm bài thi theo payload truyền lên (không khuyên dùng)
+- `POST /api/start_exam_attempt` — bắt đầu lượt làm bài, trả về `exam_attempt_id` và nội dung bài thi
+- `POST /api/start_exam_attempt_by_room` — bắt đầu lượt làm bài theo phòng thi, đồng bộ với `room_member`
+- `POST /api/time_attempt_end` — lấy timestamp hiện tại và thời gian kết thúc bài làm
+- `GET /api/attempt?exam_attempt_id=<id>` — lấy danh sách câu hỏi của lượt thi và lựa chọn đáp án gần nhất của user
+- `GET /api/score_attempt?exam_attempt_id=<id>` — tính điểm của lượt làm bài (ưu tiên dùng)
+- `POST /api/save_user_answer` — lưu lịch sử chọn đáp án của người dùng cho một câu hỏi
+
+#### 4) Room / matchmaking
+- `POST /api/create_room` — tạo phòng thi mới với `name`, `exam_id`, `duration`
+- `POST /api/start_room` — chuyển phòng sang trạng thái `ongoing` và sinh exam attempt cho tất cả thành viên
+- `POST /api/close_room` — đóng phòng thi (`closed`)
+- `POST /api/room_scores` — lấy bảng điểm tổng của phòng
+- `POST /api/room_member_score` — lấy điểm chi tiết của một member trong phòng
+- `POST /api/my_room_score` — lấy điểm của user hiện tại trong phòng
+- `POST /api/delete_room` — xóa phòng và tất cả member trong phòng
+- `POST /api/join_room` — tham gia phòng bằng `room_code`, chỉ cho phép khi phòng đang `open`
+- `POST /api/leave_room` — rời phòng theo `room_code`
+- `GET /api/room_by_user` — lấy danh sách `room_id` mà user đang tham gia
+
+#### 5) Admin
+- `POST /<ADMIN_ROUTE>/provide_priviliged` — cấp quyền admin cho user khác
+
+> Lưu ý: các route dưới `/api` và `/<ADMIN_ROUTE>` đều đi qua middleware xác thực token, trừ các route public `/auth/register`, `/auth/login`, `/auth/refresh` và `/api/exams`.
 
 ### 0. User admin sample
 ```json
@@ -352,3 +417,297 @@ docker compose down -v
 #### 📤 Response Mẫu:
 
 * **Success (204 No Content):**
+
+---
+
+### 10. Bắt đầu làm bài kiểm tra
+
+* **Endpoint:** `POST /api/start_exam_attempt`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "exam_id": 9
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "exam_attempt_id": 5
+}
+```
+
+---
+
+### 11. Lấy thời gian kết thúc bài làm
+
+* **Endpoint:** `POST /api/time_attempt_end`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "exam_attempt_id": 5
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "now": 1723804800,
+  "time_end": 1723808400
+}
+```
+
+---
+
+### 12. Lấy câu hỏi hiện tại của lượt thi
+
+* **Endpoint:** `GET /api/attempt?exam_attempt_id=5`
+
+#### 📤 Response Mẫu:
+```json
+{
+  "question": "Trong Diesel, hàm nào dùng để mở một Transaction?",
+  "answers": [
+    "conn.start_transaction()",
+    "conn.transaction()",
+    "conn.begin()",
+    "conn.execute_transaction()"
+  ],
+  "user_answer": 2
+}
+```
+
+---
+
+### 13. Chấm điểm lượt làm bài
+
+* **Endpoint:** `GET /api/score_attempt?exam_attempt_id=5`
+
+#### 📤 Response Mẫu:
+```json
+{
+  "score": 3,
+  "sum_of_question": 10
+}
+```
+
+---
+
+### 14. Lưu đáp án người dùng
+
+* **Endpoint:** `POST /api/save_user_answer`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "exam_attempt_id": 5,
+  "question_id": 11,
+  "answer_id": 43
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "time": 1723804920
+}
+```
+
+---
+
+### 15. Tạo và tham gia phòng thi
+
+#### 15.1. Tạo phòng thi
+
+* **Endpoint:** `POST /api/create_room`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "name": "PhongRust01",
+  "exam_id": 9,
+  "duration": 15
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "room_id": 3
+}
+```
+
+#### 15.2. Tham gia phòng theo mã phòng
+
+* **Endpoint:** `POST /api/join_room`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "room_code": "ROOM-1-123456"
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "room_id": 3
+}
+```
+
+> Chỉ cho phép join khi phòng đang ở trạng thái `open`. Nếu phòng đã bắt đầu hoặc đóng, API sẽ trả về lỗi `BAD_REQUEST`.
+
+#### 15.3. Rời phòng
+
+* **Endpoint:** `POST /api/leave_room`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "room_code": "ROOM-1-123456"
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "room_id": 3
+}
+```
+
+#### 15.4. Lấy danh sách phòng của user
+
+* **Endpoint:** `GET /api/room_by_user`
+
+#### 📤 Response Mẫu:
+```json
+{
+  "room_ids": [3, 8, 12]
+}
+```
+
+#### 15.5. Bắt đầu lượt thi trong phòng
+
+* **Endpoint:** `POST /api/start_exam_attempt_by_room`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "room_id": 3
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "exam_attempt_id": 12,
+  "exam_content": {
+    "exam_id": 9,
+    "questions": [
+      {
+        "question": {
+          "id": 23,
+          "exam_id": 9,
+          "content": "Trong Diesel, hàm nào dùng để mở một Transaction?"
+        },
+        "answers": [
+          {
+            "id": 89,
+            "question_id": 23,
+            "content": "conn.start_transaction()"
+          },
+          {
+            "id": 90,
+            "question_id": 23,
+            "content": "conn.transaction()"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+> Khi gọi API này, bạn sẽ nhận trực tiếp `exam_content`, từ đó có thể lấy `question_id` và `answer_id` tương ứng để lưu đáp án.
+
+#### 15.6. Lấy bảng điểm của phòng
+
+* **Endpoint:** `POST /api/room_scores`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "room_id": 3
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+[
+  {
+    "user_id": 2,
+    "score": 2,
+    "total": 2
+  },
+  {
+    "user_id": 5,
+    "score": 1,
+    "total": 2
+  }
+]
+```
+
+#### 15.7. Lấy điểm chi tiết của một user trong phòng
+
+* **Endpoint:** `POST /api/room_member_score`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "room_id": 3,
+  "user_id": 2
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "user_id": 2,
+  "score": 2,
+  "total": 2
+}
+```
+
+#### 15.8. Lấy điểm của chính user hiện tại trong phòng
+
+* **Endpoint:** `POST /api/my_room_score`
+* **Content-Type:** `application/json`
+
+#### 📥 Example Request Payload:
+```json
+{
+  "room_id": 3
+}
+```
+
+#### 📤 Response Mẫu:
+```json
+{
+  "user_id": 2,
+  "score": 2,
+  "total": 2
+}
+```
+
+---

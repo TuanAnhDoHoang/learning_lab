@@ -31,11 +31,13 @@ use jsonwebtoken::Validation;
 use serde::{Deserialize, Serialize};
 use sha2::Digest;
 use sha2::Sha256;
+use uuid::Uuid;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: i32, // user_id — đủ để identify, các thông tin khác query lại DB nếu cần
     pub name: String,
     pub email: String,
+    pub jti: String,
     pub typ: String, // "access" | "refresh" — phân biệt loại token
     pub exp: usize,
 }
@@ -47,10 +49,13 @@ pub fn new_token(
     typ: &str,
     expires_time: NaiveDateTime,
 ) -> anyhow::Result<String> {
+    let jti = Uuid::new_v4().to_string();
+
     let claims = Claims {
         sub: userid,
         name: username.to_string(),
         email: email.to_string(),
+        jti,
         typ: typ.to_string(),
         exp: expires_time.and_utc().timestamp() as usize,
     };

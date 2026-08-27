@@ -15,8 +15,12 @@ use tower_http::cors::{Any, CorsLayer}; // Import các module r2d2
 
 use crate::{
     handlers::{
+        answer_history::save_attempt_answer,
         exam::{create_new_exam, get_exams},
+        exam_attempt::{attempt_score, create_exam_attempt, get_attempt, get_time_attempt_end, create_exam_attempt_by_room},
         question::get_question,
+        room::{close_room, create_room, delete_room, start_room},
+        room_member::{get_room_by_userid, join_room, leave_room},
         score::handle_score,
         token::refresh,
         user::{login, logout, provide_priviliged, register},
@@ -73,6 +77,22 @@ async fn main() -> anyhow::Result<()> {
         .route("/new_exam", post(create_new_exam))
         .route("/questions", get(get_question))
         .route("/score", post(handle_score))
+        .route("/start_exam_attempt", post(create_exam_attempt))
+        .route("/start_exam_attempt_by_room", post(create_exam_attempt_by_room))
+        .route("/time_attempt_end", post(get_time_attempt_end))
+        .route("/attempt", get(get_attempt))
+        .route("/score_attempt", get(attempt_score))
+        .route("/save_user_answer", post(save_attempt_answer))
+        .route("/create_room", post(create_room))
+        .route("/start_room", post(start_room))
+        .route("/close_room", post(close_room))
+        .route("/room_scores", post(crate::handlers::room::room_scores))
+        .route("/room_member_score", post(crate::handlers::room::room_member_score))
+        .route("/my_room_score", post(crate::handlers::room::my_room_score))
+        .route("/delete_room", post(delete_room))
+        .route("/join_room", post(join_room))
+        .route("/leave_room", post(leave_room))
+        .route("/room_by_user", get(get_room_by_userid))
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             authorization_middleware,

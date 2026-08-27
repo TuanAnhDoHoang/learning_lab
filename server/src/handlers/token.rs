@@ -33,7 +33,7 @@ pub async fn refresh(
     }
 
     let user = find_user_by_id(refresh_token_stored.user_id, &mut conn)
-        .map_err(|_| (StatusCode::BAD_REQUEST, format!("Invalid refresh token 2")))?;
+        .map_err(|_| (StatusCode::BAD_REQUEST, format!("Invalid refresh token")))?;
 
     let now = Utc::now().naive_utc();
     let refesh_expires_time = now + TimeDelta::days(30);
@@ -46,13 +46,12 @@ pub async fn refresh(
         "access",
         access_expires_time,
     )
-    .map_err(|_| (StatusCode::BAD_REQUEST, format!("Invalid refresh token 3")))?;
+    .map_err(|_| (StatusCode::BAD_REQUEST, format!("Invalid refresh token")))?;
 
     diesel::update(refresh_tokens::table.filter(refresh_tokens::id.eq(refresh_token_stored.id)))
         .set(refresh_tokens::is_revoked.eq(true))
         .execute(&mut conn)
         .ok();
-
 
     let refesh_token = token::new_token(
         user.id,
@@ -69,10 +68,10 @@ pub async fn refresh(
     })?;
     let refesh_token_hash = token::hash_token(&refesh_token);
 
-    token::insert_token(user.id, &refesh_token_hash, refesh_expires_time, &mut conn).map_err(|_e| {
+    token::insert_token(user.id, &refesh_token_hash, refesh_expires_time, &mut conn).map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Error saving new refresh token".to_string(),
+            format!("Error saving new refresh token: {}", e),
         )
     })?;
 

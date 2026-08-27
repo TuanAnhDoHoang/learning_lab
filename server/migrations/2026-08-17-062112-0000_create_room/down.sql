@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS room;
+DROP TYPE IF EXISTS room_status;

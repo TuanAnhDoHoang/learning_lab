@@ -3,3 +3,7 @@ pub mod question;
 pub mod score;
 pub mod user;
 pub mod token;
+pub mod exam_attempt;
+pub mod answer_history;
+pub mod room;
+pub mod room_member;
