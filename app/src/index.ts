@@ -5,6 +5,19 @@ export interface Exam {
   name: string;
 }
 
+// For POST /api/new_exam
+export interface QuestionPayload {
+  question: string;
+  answers: string[]; // 4 answers
+  right_answer: number; // 0-3 index
+}
+
+export interface CreateExamPayload {
+  exam_name: string;
+  domain: string;
+  questions: QuestionPayload[];
+}
+
 // Matches the backend Question struct
 export interface Question {
   id: number;

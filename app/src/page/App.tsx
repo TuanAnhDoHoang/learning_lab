@@ -8,11 +8,12 @@ import { ExamCard } from '../components/ExamCard';
 import { Sidebar } from '../components/Sidebar';
 import { ExamModal } from '../components/ExamModal';
 import { Footer } from '../components/Footer';
-import { ExamPage } from './exampage';
-import { LoginPage } from './loginpage';
-import { RegisterPage } from './registerpage';
-import { RoomPage } from './roompage';
-import { ProctorDashboard } from './proctordashboard';
+import { ExamPage } from './ExamPage';
+import { LoginPage } from './LoginPage';
+import { RegisterPage } from './RegisterPage';
+import { RoomPage } from './RoomPage';
+import { ProctorDashboard } from './ProctorDashBoard';
+import { CreateExamPage } from './CreateExamPage';
 import { Exam, CustomExamData, HostRoleMode } from '..';
 import { fetchExams, logoutUser, isAuthenticated } from '../api/apicaller';
 
@@ -56,8 +57,8 @@ export const App: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeModalExam, setActiveModalExam] = useState<Exam | null>(null);
 
-  // View state: 'home' | 'rooms' | 'login' | 'register'
-  const [currentView, setCurrentView] = useState<'home' | 'rooms' | 'login' | 'register'>(() => {
+  // View state: 'home' | 'rooms' | 'login' | 'register' | 'create_exam'
+  const [currentView, setCurrentView] = useState<'home' | 'rooms' | 'login' | 'register' | 'create_exam'>(() => {
     return isAuthenticated() ? 'home' : 'login';
   });
 
@@ -244,6 +245,30 @@ export const App: React.FC = () => {
           onStartExam={handleStartExamFromRoom}
           onBackToHome={() => setCurrentView('home')}
         />
+        <Footer />
+      </div>
+    );
+  }
+
+  // Render Create Exam view
+  if (currentView === 'create_exam') {
+    return (
+      <div className="app-root">
+        <Navbar
+          currentView={currentView}
+          onNavigate={(view: any) => setCurrentView(view)}
+          user={user}
+          onOpenLogin={() => setCurrentView('login')}
+          onLogout={handleLogout}
+        />
+        <main className="main-layout">
+          <div className="container">
+            <CreateExamPage onBackToHome={() => {
+              setCurrentView('home');
+              loadExams(); // Reload exams to show newly created exam
+            }} />
+          </div>
+        </main>
         <Footer />
       </div>
     );
