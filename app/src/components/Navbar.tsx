@@ -2,7 +2,7 @@ import React from 'react';
 
 interface NavbarProps {
   currentView?: string;
-  onNavigate?: (view: 'home' | 'rooms') => void;
+  onNavigate?: (view: 'home' | 'rooms' | 'create_exam') => void;
   onOpenLogin?: () => void;
   user?: { username: string; email: string } | null;
   onLogout?: () => void;
@@ -47,6 +47,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView = 'home', onNavigate
           >
             Phòng thi
           </a>
+          {user && (
+            <a
+              href="#tao-de-thi"
+              className={`nav-item ${currentView === 'create_exam' ? 'active' : ''}`}
+              onClick={(e) => { e.preventDefault(); onNavigate?.('create_exam'); }}
+            >
+              Tạo đề thi
+            </a>
+          )}
           <a href="#note-ai" className="nav-item ai-badge">
             NOTE AI
           </a>

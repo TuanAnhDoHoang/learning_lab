@@ -59,6 +59,20 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 }
 
 /* ── API Endpoints ── */
+import { CreateExamPayload } from '../index';
+
+// Create a new exam
+export async function createExam(payload: CreateExamPayload) {
+  const res = await fetchWithAuth(`${API_BASE}/new_exam`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const errorMsg = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to create exam: ${errorMsg || res.statusText}`);
+  }
+  return res.json();
+}
 
 // Fetch exams from the backend API
 export async function fetchExams() {
