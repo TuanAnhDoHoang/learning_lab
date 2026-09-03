@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 interface NavbarProps {
   currentView?: string;
@@ -6,9 +6,35 @@ interface NavbarProps {
   onOpenLogin?: () => void;
   user?: { username: string; email: string } | null;
   onLogout?: () => void;
+  onOpenHistory?: () => void;
+  onOpenSettings?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentView = 'home', onNavigate, onOpenLogin, user, onLogout }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentView = 'home',
+  onNavigate,
+  onOpenLogin,
+  user,
+  onLogout,
+  onOpenHistory,
+  onOpenSettings,
+}) => {
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const firstLetter = user?.username ? user.username.charAt(0).toUpperCase() : 'U';
 
   return (
     <header className="navbar">
@@ -62,17 +88,137 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView = 'home', onNavigate
           <a href="#flashcards" className="nav-item">Flashcards</a>
 
           {user ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                {user.username}
-              </span>
+            <div className="user-profile-menu-wrapper" ref={dropdownRef} style={{ position: 'relative' }}>
               <button
-                className="btn-login"
-                style={{ background: 'var(--bg-surface-hover)', color: 'var(--text-muted)', border: '1px solid var(--border-color)', boxShadow: 'none' }}
-                onClick={onLogout}
+                type="button"
+                onClick={() => setDropdownOpen(prev => !prev)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: 'var(--bg-surface)',
+                  border: '1px solid var(--border-color)',
+                  padding: '5px 12px 5px 6px',
+                  borderRadius: '24px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
               >
-                Đăng xuất
+                <div
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '50%',
+                    background: 'var(--primary-color)',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  {firstLetter}
+                </div>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                  {user.username}
+                </span>
               </button>
+
+              {dropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    width: '210px',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '12px',
+                    boxShadow: 'var(--shadow-md, 0 10px 25px rgba(0,0,0,0.15))',
+                    padding: '8px 0',
+                    zIndex: 1000,
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div style={{ padding: '8px 16px 10px 16px', borderBottom: '1px solid var(--border-color)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--text-main)' }}>{user.username}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onOpenHistory?.();
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-main)',
+                      fontSize: '0.88rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-hover, rgba(0,0,0,0.04))'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    Lịch sử thi
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onOpenSettings?.();
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'var(--text-main)',
+                      fontSize: '0.88rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--bg-surface-hover, rgba(0,0,0,0.04))'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    Cài đặt
+                  </button>
+
+                  <div style={{ height: '1px', background: 'var(--border-color)', margin: '4px 0' }}></div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onLogout?.();
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: '10px 16px',
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    Đăng xuất
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <button className="btn-login" onClick={onOpenLogin}>Đăng nhập</button>

@@ -1,35 +1,74 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { CandidateProgress, ProctorActivityEvent, CustomExamData, CandidateLiveState } from '..';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { CandidateProgress, ProctorActivityEvent, CustomExamData, CandidateLiveState, RoomMemberScoreItem } from '..';
+import { fetchQuestions, closeRoom, fetchRoomScores } from '../api/apicaller';
 
 interface ProctorDashboardProps {
+  roomId?: number;
+  examId?: number;
   roomCode: string;
   roomTitle: string;
   examName: string;
   customExamData?: CustomExamData | null;
   durationMinutes: number;
+  initialTimeLeftSeconds?: number;
   enableAntiCheat: boolean;
   participants: string[];
-  currentUser: { username: string; email: string } | null;
+  currentUser: { username: string; email: string; userid?: number } | null;
   onEndExam: () => void;
   onBackToHome: () => void;
 }
 
 export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
+  roomId,
+  examId,
   roomCode,
   roomTitle,
   examName,
   customExamData,
   durationMinutes = 15,
+  initialTimeLeftSeconds,
   enableAntiCheat = true,
   participants,
   currentUser,
   onEndExam,
   onBackToHome,
 }) => {
-  const totalDurationSeconds = durationMinutes * 60;
+  const totalDurationSeconds = initialTimeLeftSeconds !== undefined
+    ? Math.max(0, initialTimeLeftSeconds)
+    : durationMinutes * 60;
   const [timeLeft, setTimeLeft] = useState<number>(totalDurationSeconds);
-  const [isExamFinished, setIsExamFinished] = useState<boolean>(false);
-  const totalQuestions = customExamData?.questions?.length || 10;
+  const [isExamFinished, setIsExamFinished] = useState<boolean>(totalDurationSeconds <= 0);
+  const [isEndingRoom, setIsEndingRoom] = useState<boolean>(false);
+  const [finalScores, setFinalScores] = useState<RoomMemberScoreItem[] | null>(null);
+  const [showScoreModal, setShowScoreModal] = useState<boolean>(false);
+  const [totalQuestions, setTotalQuestions] = useState<number>(() => customExamData?.questions?.length || 0);
+
+  // Fetch real questions for proctor from backend if examId is present
+  useEffect(() => {
+    if (examId && examId > 0) {
+      fetchQuestions(examId)
+        .then((res: any) => {
+          if (res?.questions) {
+            const count = res.questions.length;
+            setTotalQuestions(count);
+            setCandidates(prev => prev.map(c => ({
+              ...c,
+              totalQuestions: count
+            })));
+          }
+        })
+        .catch((err: any) => {
+          console.error('Failed to fetch questions for proctor:', err);
+        });
+    } else if (customExamData?.questions?.length) {
+      const count = customExamData.questions.length;
+      setTotalQuestions(count);
+      setCandidates(prev => prev.map(c => ({
+        ...c,
+        totalQuestions: count
+      })));
+    }
+  }, [examId, customExamData]);
 
   // Selected candidate for sending warning modal
   const [warningModalCandidate, setWarningModalCandidate] = useState<CandidateProgress | null>(null);
@@ -90,6 +129,77 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     setActivityLogs(prev => [newEvent, ...prev.slice(0, 49)]); // keep last 50
   };
 
+  // 4. End room, score all students, and show final score table
+  const finishAndShowScores = useCallback(async () => {
+    setIsEndingRoom(true);
+    try {
+      if (roomId && roomId > 0) {
+        // 1. Close room and auto-score unsubmitted attempts on server
+        await closeRoom(roomId).catch(() => {});
+        addActivityLog('Hệ thống', 'info', 'Đã gửi lệnh đóng phòng thi. Hệ thống đang tổng hợp điểm số...');
+
+        // 2. Fetch final room scores
+        const res = await fetchRoomScores(roomId);
+        if (res && res.members) {
+          setFinalScores(res.members);
+          setShowScoreModal(true);
+          setIsExamFinished(true);
+          addActivityLog('Hệ thống', 'success', `Đã lấy thành công bảng điểm của ${res.members.length} thí sinh.`);
+        }
+      } else {
+        // Fallback for local/demo test
+        setIsExamFinished(true);
+        const mockMembers: RoomMemberScoreItem[] = candidates.map((c, idx) => ({
+          user_id: idx + 101,
+          score: {
+            score: c.score !== undefined ? c.score : Math.min(c.answeredCount, totalQuestions),
+            sum_of_question: totalQuestions || 10,
+          },
+        }));
+        setFinalScores(mockMembers);
+        setShowScoreModal(true);
+      }
+    } catch (err: any) {
+      console.error('Failed to close room and get scores:', err);
+      showToast(`Có lỗi khi kết thúc phòng thi: ${err.message || err}`);
+      setIsExamFinished(true);
+    } finally {
+      setIsEndingRoom(false);
+    }
+  }, [roomId, candidates, totalQuestions]);
+
+  // If initialTimeLeftSeconds is already <= 0 upon mounting, immediately show final scores
+  useEffect(() => {
+    if (initialTimeLeftSeconds !== undefined && initialTimeLeftSeconds <= 0) {
+      finishAndShowScores();
+    }
+  }, [initialTimeLeftSeconds, finishAndShowScores]);
+
+  // Load real members for the room
+  useEffect(() => {
+    if (roomId && roomId > 0) {
+      fetchRoomScores(roomId)
+        .then(res => {
+          if (res.members && res.members.length > 0) {
+            setCandidates(res.members.map((m) => ({
+              id: `cand-${m.user_id}`,
+              name: m.user_id === currentUser?.userid ? `${currentUser?.username || 'Bạn'} (Chủ phòng)` : `Học sinh ID: ${m.user_id}`,
+              state: m.score ? ('submitted' as CandidateLiveState) : ('active' as CandidateLiveState),
+              answeredCount: m.score ? m.score.score : 0,
+              totalQuestions: totalQuestions || 10,
+              violationsCount: 0,
+              violationsList: [],
+              lastHeartbeat: 'Vừa xong',
+              timeSpentSeconds: 0,
+              score: m.score?.score,
+              bonusMinutesAdded: 0,
+            })));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [roomId, totalQuestions, currentUser]);
+
   /* ── Room Countdown Timer ── */
   useEffect(() => {
     if (isExamFinished) return;
@@ -100,6 +210,7 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
           clearInterval(timerRef.current!);
           setIsExamFinished(true);
           addActivityLog('Hệ thống', 'info', 'Thời gian làm bài của phòng thi đã kết thúc. Toàn bộ bài làm đã được thu tự động.');
+          finishAndShowScores();
           return 0;
         }
         return prev - 1;
@@ -109,79 +220,14 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [isExamFinished]);
+  }, [isExamFinished, finishAndShowScores]);
 
-  /* ── Realistic Live Simulation of Student Actions & Heartbeat Events ── */
+  /* ── No more Realistic Live Simulation of Student Actions & Heartbeat Events ── */
   useEffect(() => {
     if (isExamFinished) return;
-
-    const interval = setInterval(() => {
-      setCandidates(prev => {
-        return prev.map(cand => {
-          if (cand.state === 'submitted' || cand.state === 'disqualified') {
-            return cand;
-          }
-
-          // Random candidate answer progress progression
-          let newAnswered = cand.answeredCount;
-          if (Math.random() < 0.35 && newAnswered < totalQuestions) {
-            newAnswered += 1;
-          }
-
-          // Random simulated network disruption or tab switch
-          const rand = Math.random();
-          let newState: CandidateLiveState = cand.state;
-          let newViolations = [...cand.violationsList];
-
-          // 1. Simulate Network Disconnect / Offline (Rare ~ 3% chance)
-          if (cand.state === 'active' && rand < 0.03) {
-            newState = 'offline';
-            addActivityLog(cand.name, 'warning', `Mất tín hiệu kết nối Internet (Offline). Bài làm tạm thời được lưu an toàn trên máy thí sinh.`);
-          }
-          // Reconnect back from offline (~ 40% chance when offline)
-          else if (cand.state === 'offline' && rand < 0.40) {
-            newState = 'active';
-            addActivityLog(cand.name, 'success', `Đã kết nối lại thành công sau sự cố gián đoạn.`);
-          }
-          // 2. Simulate Tab Switch Violation (~ 4% chance if anti-cheat enabled)
-          else if (enableAntiCheat && cand.state === 'active' && rand > 0.96) {
-            const vRecord = {
-              id: newViolations.length + 1,
-              type: 'tab_switch' as const,
-              message: 'Rời khỏi tab bài thi hoặc chuyển sang ứng dụng khác',
-              timestamp: new Date().toLocaleTimeString(),
-            };
-            newViolations.push(vRecord);
-            addActivityLog(cand.name, 'danger', `Vi phạm lần #${newViolations.length}: Rời tab bài thi sang ứng dụng khác.`);
-
-            if (newViolations.length >= 3) {
-              newState = 'disqualified';
-              addActivityLog(cand.name, 'danger', `ĐÃ BỊ TRUẤT QUYỀN: Vi phạm quy chế quá 3 lần.`);
-            }
-          }
-          // 3. Complete and submit exam when all questions answered
-          else if (newAnswered >= totalQuestions && cand.state === 'active' && rand < 0.2) {
-            newState = 'submitted';
-            const simScore = Math.max(1, Math.round(totalQuestions * (0.6 + (Math.random() * 0.4))));
-            cand.score = simScore;
-            addActivityLog(cand.name, 'info', `Đã nộp bài thi thành công. Điểm số: ${simScore}/${totalQuestions}.`);
-          }
-
-          return {
-            ...cand,
-            state: newState,
-            answeredCount: newAnswered,
-            violationsCount: newViolations.length,
-            violationsList: newViolations,
-            timeSpentSeconds: cand.timeSpentSeconds + 2,
-            lastHeartbeat: newState === 'offline' ? 'Mất tín hiệu' : '1s trước',
-          };
-        });
-      });
-    }, 2500);
-
-    return () => clearInterval(interval);
+    // Mock simulation removed as requested by user.
   }, [isExamFinished, totalQuestions, enableAntiCheat]);
+
 
   /* ── Proctor Actions ── */
 
@@ -223,6 +269,14 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     }));
   };
 
+  // 4. Manual end room button (asks for confirmation)
+  const handleEndRoom = async () => {
+    if (!window.confirm('Bạn có chắc chắn muốn kết thúc buổi thi và thu bài của tất cả thí sinh ngay bây giờ?')) {
+      return;
+    }
+    await finishAndShowScores();
+  };
+
   // Format time mm:ss
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -252,6 +306,102 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
       {toastMsg && (
         <div className="exam-toast">
           {toastMsg}
+        </div>
+      )}
+
+      {/* ── FINAL SCORES SUMMARY MODAL ── */}
+      {showScoreModal && finalScores && (
+        <div className="violation-modal-overlay">
+          <div
+            className="violation-modal-card"
+            style={{
+              maxWidth: '680px',
+              width: '90%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              textAlign: 'center',
+              padding: '32px 24px',
+            }}
+          >
+            <div style={{ display: 'inline-block', background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', padding: '4px 14px', borderRadius: '20px', fontWeight: 800, fontSize: '0.82rem', marginBottom: '12px', border: '1px solid rgba(34, 197, 94, 0.3)' }}>
+              PHÒNG THI ĐÃ KẾT THÚC
+            </div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>
+              Bảng Điểm Tổng Kết Phòng Thi
+            </h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '20px' }}>
+              Mã phòng: <strong>{roomCode}</strong> | Đề: <strong>{examName}</strong> | Tổng thí sinh: <strong>{finalScores.length}</strong>
+            </p>
+
+            <div style={{ overflowX: 'auto', marginBottom: '24px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+                <thead>
+                  <tr style={{ background: 'var(--bg-primary)', borderBottom: '2px solid var(--border-color)' }}>
+                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>Hạng</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700 }}>Thí sinh</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'center' }}>Điểm số</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'center' }}>Tỷ lệ</th>
+                    <th style={{ padding: '10px 12px', fontWeight: 700, textAlign: 'center' }}>Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {finalScores
+                    .slice()
+                    .sort((a, b) => (b.score?.score || 0) - (a.score?.score || 0))
+                    .map((item, idx) => {
+                      const scoreVal = item.score?.score ?? 0;
+                      const sumVal = item.score?.sum_of_question ?? totalQuestions ?? 0;
+                      const percent = sumVal > 0 ? Math.round((scoreVal / sumVal) * 100) : 0;
+                      return (
+                        <tr key={item.user_id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px', fontWeight: 700, color: idx === 0 ? '#eab308' : idx === 1 ? '#94a3b8' : idx === 2 ? '#b45309' : 'inherit' }}>
+                            #{idx + 1}
+                          </td>
+                          <td style={{ padding: '12px', fontWeight: 600 }}>
+                            Học sinh ID: {item.user_id}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center', fontWeight: 700 }}>
+                            {scoreVal} / {sumVal}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <span style={{ fontWeight: 700, color: percent >= 50 ? '#22c55e' : '#ef4444' }}>
+                              {percent}%
+                            </span>
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <span style={{ fontSize: '0.8rem', padding: '3px 8px', borderRadius: '4px', background: 'rgba(34, 197, 94, 0.1)', color: '#22c55e', fontWeight: 600 }}>
+                              Đã nộp bài
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowScoreModal(false);
+                  onEndExam();
+                }}
+                style={{
+                  padding: '12px 28px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: 'var(--primary-color)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: '0.95rem',
+                  cursor: 'pointer',
+                }}
+              >
+                Về trang chủ
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -317,14 +467,10 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
 
           <button
             className="btn-end-proctor"
-            onClick={() => {
-              if (window.confirm('Bạn có chắc chắn muốn kết thúc buổi thi và thu bài của tất cả thí sinh ngay bây giờ?')) {
-                setIsExamFinished(true);
-                onEndExam();
-              }
-            }}
+            onClick={handleEndRoom}
+            disabled={isEndingRoom}
           >
-            Kết thúc phòng thi
+            {isEndingRoom ? 'Đang tổng hợp điểm...' : 'Kết thúc phòng thi'}
           </button>
         </div>
       </header>
@@ -384,7 +530,7 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
                 </thead>
                 <tbody>
                   {filteredCandidates.map(cand => {
-                    const percent = Math.round((cand.answeredCount / cand.totalQuestions) * 100);
+                    const percent = cand.totalQuestions > 0 ? Math.round((cand.answeredCount / cand.totalQuestions) * 100) : 0;
 
                     return (
                       <tr key={cand.id} className={`cand-row state-${cand.state}`}>
@@ -537,3 +683,4 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
     </div>
   );
 };
+

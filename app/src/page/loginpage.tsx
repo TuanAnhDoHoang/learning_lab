@@ -70,21 +70,18 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToRegi
 
             <div className="auth-features">
               <div className="auth-feature">
-                <span className="feature-icon">📚</span>
                 <div>
                   <strong>Kho đề thi đa dạng</strong>
                   <p>Toán, Lý, Hóa và nhiều lĩnh vực khác</p>
                 </div>
               </div>
               <div className="auth-feature">
-                <span className="feature-icon">⚡</span>
                 <div>
                   <strong>Chấm điểm tự động</strong>
                   <p>Kết quả ngay lập tức sau khi nộp bài</p>
                 </div>
               </div>
               <div className="auth-feature">
-                <span className="feature-icon">✦</span>
                 <div>
                   <strong>Phân tích bằng AI</strong>
                   <p>Gợi ý đáp án và phân tích lỗi sai thông minh</p>
@@ -104,7 +101,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onGoToRegi
 
             {error && (
               <div className="auth-error">
-                <span>⚠️</span> {error}
+                {error}
               </div>
             )}
 

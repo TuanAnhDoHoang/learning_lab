@@ -108,3 +108,96 @@ export interface ProctorActivityEvent {
   type: 'info' | 'warning' | 'danger' | 'success';
   message: string;
 }
+
+// Room Management Types
+export interface CreateRoomPayload {
+    name: string;
+    exam_id: number;
+    duration: number;
+}
+
+export interface CreateRoomResponse {
+    room_id: number;
+    room_code: string;
+}
+
+export interface JoinRoomPayload {
+    room_code: string;
+}
+
+export interface JoinRoomResponse {
+    room_id: number;
+}
+
+export interface LeaveRoomPayload {
+    room_code: string;
+}
+
+export interface LeaveRoomResponse {
+    room_id: number;
+}
+
+export interface StartRoomPayload {
+    room_id: number;
+}
+
+export interface StartRoomResponse {
+    room_id: number;
+    status: string;
+    mems: number[];
+}
+
+export interface QuestionAnswer {
+    question: Question;
+    answers: Answer[];
+}
+
+export interface ExamContent {
+    exam_id: number;
+    questions: QuestionAnswer[];
+}
+
+export interface StartExamAttemptByRoomResponse {
+    exam_attempt_id: number;
+    exam_content: ExamContent;
+}
+
+export interface RoomMemberScoreItem {
+    user_id: number;
+    score: {
+        score: number;
+        sum_of_question: number;
+    } | null;
+}
+
+export interface RoomScoresResponse {
+    room_id: number;
+    members: RoomMemberScoreItem[];
+}
+
+export interface StartExamAttemptPayload {
+    exam_id: number;
+}
+
+export interface StartExamAttemptResponse {
+    exam_attempt_id: number;
+    exam_content: ExamContent;
+}
+
+export interface TimeAttemptEndResponse {
+    now: number;
+    time_end: number;
+}
+
+export interface AttemptResponseItem {
+    question: string;
+    answers: string[];
+    user_answer: number | null;
+}
+
+export interface ScoreAttemptResponse {
+    score: number;
+    sum_of_question: number;
+}
+
+

@@ -104,21 +104,18 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
 
             <div className="auth-features">
               <div className="auth-feature">
-                <span className="feature-icon">🎯</span>
                 <div>
                   <strong>Theo dõi tiến độ</strong>
                   <p>Lưu lại lịch sử làm bài và phân tích điểm mạnh/yếu</p>
                 </div>
               </div>
               <div className="auth-feature">
-                <span className="feature-icon">🏆</span>
                 <div>
                   <strong>Bảng xếp hạng</strong>
                   <p>So sánh kết quả với bạn bè và cộng đồng</p>
                 </div>
               </div>
               <div className="auth-feature">
-                <span className="feature-icon">💡</span>
                 <div>
                   <strong>Gợi ý thông minh</strong>
                   <p>AI đề xuất đề thi phù hợp với trình độ của bạn</p>
@@ -138,7 +135,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onRegisterSuccess, o
 
             {error && (
               <div className="auth-error">
-                <span>⚠️</span> {error}
+                {error}
               </div>
             )}
 

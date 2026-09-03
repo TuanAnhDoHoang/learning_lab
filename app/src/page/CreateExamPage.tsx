@@ -7,6 +7,7 @@ interface CreateExamPageProps {
 }
 
 export const CreateExamPage: React.FC<CreateExamPageProps> = ({ onBackToHome }) => {
+  const [createMode, setCreateMode] = useState<'manual' | 'image' | 'pdf'>('manual');
   const [examName, setExamName] = useState('');
   const [domain, setDomain] = useState('');
   const [questions, setQuestions] = useState<QuestionPayload[]>([
@@ -95,14 +96,105 @@ export const CreateExamPage: React.FC<CreateExamPageProps> = ({ onBackToHome }) 
     <div className="ce-container">
       <div className="ce-page-header">
         <h2 className="ce-page-title">Tạo Đề Thi Mới</h2>
+        
+        {/* Creation Mode Switcher */}
+        <div style={{ display: 'flex', gap: '12px', marginTop: '16px', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            onClick={() => setCreateMode('manual')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              background: createMode === 'manual' ? 'var(--primary-color)' : 'var(--bg-surface)',
+              color: createMode === 'manual' ? '#fff' : 'var(--text-main)',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            Soạn thủ công
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCreateMode('image')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              background: createMode === 'image' ? 'var(--primary-color)' : 'var(--bg-surface)',
+              color: createMode === 'image' ? '#fff' : 'var(--text-main)',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            Tạo đề từ ảnh
+            <span
+              style={{
+                fontSize: '0.72rem',
+                background: createMode === 'image' ? 'rgba(255,255,255,0.25)' : 'rgba(245, 158, 11, 0.15)',
+                color: createMode === 'image' ? '#fff' : '#f59e0b',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontWeight: 800,
+                border: createMode === 'image' ? 'none' : '1px solid rgba(245, 158, 11, 0.3)',
+              }}
+            >
+              Sắp ra mắt
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setCreateMode('pdf')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color)',
+              background: createMode === 'pdf' ? 'var(--primary-color)' : 'var(--bg-surface)',
+              color: createMode === 'pdf' ? '#fff' : 'var(--text-main)',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              transition: 'all 0.2s ease',
+            }}
+          >
+            Tạo đề từ file PDF
+            <span
+              style={{
+                fontSize: '0.72rem',
+                background: createMode === 'pdf' ? 'rgba(255,255,255,0.25)' : 'rgba(245, 158, 11, 0.15)',
+                color: createMode === 'pdf' ? '#fff' : '#f59e0b',
+                padding: '2px 8px',
+                borderRadius: '4px',
+                fontWeight: 800,
+                border: createMode === 'pdf' ? 'none' : '1px solid rgba(245, 158, 11, 0.3)',
+              }}
+            >
+              Sắp ra mắt
+            </span>
+          </button>
+        </div>
       </div>
 
-      <form className="ce-form" onSubmit={handleSubmit}>
-        
-        {/* TOP SECTION: Info */}
-        <div className="ce-top-info">
-          <div className="ce-field-group ce-flex-2">
-            <label>Tên đề thi <span className="ce-required">*</span></label>
+      {/* MODE 1: MANUAL CREATION */}
+      {createMode === 'manual' && (
+        <form className="ce-form" onSubmit={handleSubmit}>
+          
+          {/* TOP SECTION: Info */}
+          <div className="ce-top-info">
+            <div className="ce-field-group ce-flex-2">
+              <label>Tên đề thi <span className="ce-required">*</span></label>
             <input 
               type="text" 
               className="ce-input" 
@@ -216,6 +308,135 @@ export const CreateExamPage: React.FC<CreateExamPageProps> = ({ onBackToHome }) 
           </button>
         </div>
       </form>
+      )}
+
+      {/* MODE 2: CREATE FROM IMAGE (COMING SOON) */}
+      {createMode === 'image' && (
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '36px 24px', textAlign: 'center', marginTop: '24px' }}>
+          <div style={{ display: 'inline-block', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '4px 14px', borderRadius: '20px', fontWeight: 800, fontSize: '0.82rem', marginBottom: '14px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+            Tính năng đang phát triển — Sắp ra mắt
+          </div>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>
+            Tạo Đề Thi Tự Động Từ Hình Ảnh (AI OCR)
+          </h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: '560px', margin: '0 auto 28px auto', lineHeight: 1.6 }}>
+            Công nghệ AI Vision sẽ tự động nhận diện chữ viết, công thức Toán - Lý - Hóa từ ảnh chụp đề thi và trích xuất thành các câu hỏi trắc nghiệm hoàn chỉnh.
+          </p>
+
+          <div
+            style={{
+              border: '2px dashed var(--border-color)',
+              borderRadius: '12px',
+              padding: '40px 20px',
+              maxWidth: '520px',
+              margin: '0 auto 24px auto',
+              background: 'var(--bg-primary)',
+              cursor: 'not-allowed',
+            }}
+          >
+            <p style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>Kéo thả ảnh đề thi vào đây hoặc bấm để tải lên</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Hỗ trợ định dạng: JPG, PNG, WEBP (Tối đa 15MB)</p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={onBackToHome}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-main)',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Quay lại
+            </button>
+            <button
+              type="button"
+              disabled
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--primary-color)',
+                color: '#fff',
+                fontWeight: 700,
+                opacity: 0.5,
+                cursor: 'not-allowed',
+              }}
+            >
+              Trích xuất đề thi (Sắp ra mắt)
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODE 3: CREATE FROM PDF (COMING SOON) */}
+      {createMode === 'pdf' && (
+        <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-color)', borderRadius: '16px', padding: '36px 24px', textAlign: 'center', marginTop: '24px' }}>
+          <div style={{ display: 'inline-block', background: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', padding: '4px 14px', borderRadius: '20px', fontWeight: 800, fontSize: '0.82rem', marginBottom: '14px', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+            Tính năng đang phát triển — Sắp ra mắt
+          </div>
+          <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '8px' }}>
+            Tạo Đề Thi Tự Động Từ Tài Liệu PDF (AI Parser)
+          </h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', maxWidth: '560px', margin: '0 auto 28px auto', lineHeight: 1.6 }}>
+            Tải lên tài liệu hoặc bộ đề PDF, AI sẽ tự động phân tích cấu trúc, nhận diện bảng biểu, phân đoạn từng câu hỏi và đáp án đúng.
+          </p>
+
+          <div
+            style={{
+              border: '2px dashed var(--border-color)',
+              borderRadius: '12px',
+              padding: '40px 20px',
+              maxWidth: '520px',
+              margin: '0 auto 24px auto',
+              background: 'var(--bg-primary)',
+              cursor: 'not-allowed',
+            }}
+          >
+            <p style={{ fontWeight: 700, color: 'var(--text-main)', marginBottom: '6px' }}>Kéo thả tệp PDF vào đây hoặc bấm để chọn tệp</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>Hỗ trợ định dạng: PDF tài liệu đề thi (Tối đa 25MB)</p>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+            <button
+              type="button"
+              onClick={onBackToHome}
+              style={{
+                padding: '10px 20px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-main)',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              Quay lại
+            </button>
+            <button
+              type="button"
+              disabled
+              style={{
+                padding: '10px 24px',
+                borderRadius: '8px',
+                border: 'none',
+                background: 'var(--primary-color)',
+                color: '#fff',
+                fontWeight: 700,
+                opacity: 0.5,
+                cursor: 'not-allowed',
+              }}
+            >
+              Phân tích tài liệu PDF (Sắp ra mắt)
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
