@@ -7,15 +7,17 @@ import { SubTabs } from '../components/SubTabs';
 import { ExamCard } from '../components/ExamCard';
 import { Sidebar } from '../components/Sidebar';
 import { ExamModal } from '../components/ExamModal';
+import { ExamHistoryModal } from '../components/ExamHistoryModal';
 import { Footer } from '../components/Footer';
 import { ExamPage } from './ExamPage';
 import { LoginPage } from './LoginPage';
 import { RegisterPage } from './RegisterPage';
 import { RoomPage } from './RoomPage';
+import { LobbyPage } from './LobbyPage';
 import { ProctorDashboard } from './ProctorDashBoard';
 import { CreateExamPage } from './CreateExamPage';
 import { Exam, CustomExamData, HostRoleMode } from '..';
-import { fetchExams, logoutUser, isAuthenticated } from '../api/apicaller';
+import { fetchExams, logoutUser, isAuthenticated, startExamAttempt } from '../api/apicaller';
 
 // Map domain_id to domain name (matches seed data)
 const DOMAIN_MAP: Record<number, string> = {
@@ -31,6 +33,7 @@ interface UserSession {
 }
 
 interface ActiveExamSession {
+  roomId?: number;
   examId: number;
   examName: string;
   customExamData?: CustomExamData | null;
@@ -40,10 +43,27 @@ interface ActiveExamSession {
   hostRole?: HostRoleMode;
   roomCode?: string;
   roomTitle?: string;
+  attemptId?: number; // Added for backend integration
+  preFetchedQuestions?: any[]; // QuestionWithAnswers[]
+  isHost?: boolean;
+  remainingSeconds?: number;
+}
+
+interface LobbySession {
+  roomId: number;
+  roomCode: string;
+  isHost: boolean;
+  examId?: number;
+  durationMinutes?: number;
+  hostRole?: 'proctor' | 'participant';
 }
 
 export const App: React.FC = () => {
   const [user, setUser] = useState<UserSession | null>(() => {
+    if (!isAuthenticated()) {
+      localStorage.removeItem('lab_train_user');
+      return null;
+    }
     const saved = localStorage.getItem('lab_train_user');
     return saved ? JSON.parse(saved) : null;
   });
@@ -56,13 +76,21 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<'all' | 'short'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeModalExam, setActiveModalExam] = useState<Exam | null>(null);
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+  const [settingsToast, setSettingsToast] = useState<string | null>(null);
 
-  // View state: 'home' | 'rooms' | 'login' | 'register' | 'create_exam'
-  const [currentView, setCurrentView] = useState<'home' | 'rooms' | 'login' | 'register' | 'create_exam'>(() => {
+  const handleOpenSettings = () => {
+    setSettingsToast('Tính năng Cài đặt tài khoản đang được phát triển.');
+    setTimeout(() => setSettingsToast(null), 3500);
+  };
+
+  // View state
+  const [currentView, setCurrentView] = useState<'home' | 'rooms' | 'lobby' | 'login' | 'register' | 'create_exam'>(() => {
     return isAuthenticated() ? 'home' : 'login';
   });
 
   const [takingExamSession, setTakingExamSession] = useState<ActiveExamSession | null>(null);
+  const [lobbySession, setLobbySession] = useState<LobbySession | null>(null);
 
   // Load exams function
   const loadExams = useCallback(() => {
@@ -142,38 +170,28 @@ export const App: React.FC = () => {
     return matchCat && matchSearch;
   });
 
-  // Handle starting an exam from library modal
-  const handleStartExamFromModal = (exam: Exam) => {
+  // Handle starting an exam from library modal (Single Exam with DB Attempt)
+  const handleStartExamFromModal = async (exam: Exam) => {
     setActiveModalExam(null); // Close modal
-    setTakingExamSession({
-      examId: exam.id,
-      examName: exam.name,
-      customExamData: null,
-      hostRole: 'participant',
-    });
-  };
-
-  // Handle starting an exam from Room
-  const handleStartExamFromRoom = (
-    examId: number,
-    examName: string,
-    customExamData?: CustomExamData | null,
-    durationMinutes?: number,
-    enableAntiCheat?: boolean,
-    roomParticipants?: string[],
-    hostRole: HostRoleMode = 'participant'
-  ) => {
-    setTakingExamSession({
-      examId,
-      examName,
-      customExamData,
-      durationMinutes,
-      enableAntiCheat,
-      roomParticipants,
-      hostRole,
-      roomCode: 'LT-8492',
-      roomTitle: `Phòng thi: ${examName}`,
-    });
+    try {
+      const attemptRes = await startExamAttempt(exam.id);
+      setTakingExamSession({
+        examId: exam.id,
+        examName: exam.name,
+        customExamData: null,
+        attemptId: attemptRes.exam_attempt_id,
+        preFetchedQuestions: attemptRes.exam_content.questions,
+        hostRole: 'participant',
+      });
+    } catch (err) {
+      console.warn('startExamAttempt failed, starting in local fallback mode:', err);
+      setTakingExamSession({
+        examId: exam.id,
+        examName: exam.name,
+        customExamData: null,
+        hostRole: 'participant',
+      });
+    }
   };
 
   // If taking an exam or monitoring as Proctor
@@ -181,11 +199,14 @@ export const App: React.FC = () => {
     if (takingExamSession.hostRole === 'proctor') {
       return (
         <ProctorDashboard
+          roomId={takingExamSession.roomId}
+          examId={takingExamSession.examId}
           roomCode={takingExamSession.roomCode || 'LT-8492'}
           roomTitle={takingExamSession.roomTitle || `Phòng thi: ${takingExamSession.examName}`}
           examName={takingExamSession.examName}
           customExamData={takingExamSession.customExamData}
           durationMinutes={takingExamSession.durationMinutes || 15}
+          initialTimeLeftSeconds={takingExamSession.remainingSeconds}
           enableAntiCheat={takingExamSession.enableAntiCheat ?? true}
           participants={takingExamSession.roomParticipants || []}
           currentUser={user}
@@ -204,7 +225,23 @@ export const App: React.FC = () => {
         enableAntiCheat={takingExamSession.enableAntiCheat}
         roomParticipants={takingExamSession.roomParticipants}
         currentUser={user}
+        attemptId={takingExamSession.attemptId}
+        preFetchedQuestions={takingExamSession.preFetchedQuestions}
+        isHost={takingExamSession.isHost || false}
+        roomId={takingExamSession.roomId}
+        roomCode={takingExamSession.roomCode}
         onBack={() => setTakingExamSession(null)}
+        onSwitchToProctor={(remainingSeconds) => {
+          if (takingExamSession.roomId && takingExamSession.isHost) {
+            setTakingExamSession(prev => prev ? {
+              ...prev,
+              hostRole: 'proctor',
+              remainingSeconds: remainingSeconds,
+            } : null);
+          } else {
+            setTakingExamSession(null);
+          }
+        }}
       />
     );
   }
@@ -233,17 +270,90 @@ export const App: React.FC = () => {
   if (currentView === 'rooms') {
     return (
       <div className="app-root">
+        {settingsToast && <div className="exam-toast">{settingsToast}</div>}
         <Navbar
           currentView={currentView}
           onNavigate={view => setCurrentView(view)}
           user={user}
           onOpenLogin={() => setCurrentView('login')}
           onLogout={handleLogout}
+          onOpenHistory={() => setShowHistoryModal(true)}
+          onOpenSettings={handleOpenSettings}
         />
         <RoomPage
-          currentUser={user}
-          onStartExam={handleStartExamFromRoom}
+          onRoomJoined={(roomId, roomCode, isHost, examId, durationMinutes, hostRole) => {
+            setLobbySession({ roomId, roomCode, isHost, examId, durationMinutes, hostRole });
+            setCurrentView('lobby');
+          }}
           onBackToHome={() => setCurrentView('home')}
+        />
+        <ExamHistoryModal
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          currentUser={user}
+        />
+        <Footer />
+      </div>
+    );
+  }
+
+  // Render Lobby view
+  if (currentView === 'lobby' && lobbySession) {
+    return (
+      <div className="app-root">
+        {settingsToast && <div className="exam-toast">{settingsToast}</div>}
+        <Navbar
+          currentView={currentView}
+          onNavigate={view => setCurrentView(view)}
+          user={user}
+          onOpenLogin={() => setCurrentView('login')}
+          onLogout={handleLogout}
+          onOpenHistory={() => setShowHistoryModal(true)}
+          onOpenSettings={handleOpenSettings}
+        />
+        <LobbyPage
+          roomId={lobbySession.roomId}
+          roomCode={lobbySession.roomCode}
+          isHost={lobbySession.isHost}
+          hostRole={lobbySession.hostRole}
+          onHostStartProctor={(roomId, roomCode, mems) => {
+            const mappedParticipants = mems.map(id => `Học sinh ID: ${id}`);
+            
+            setTakingExamSession({
+              roomId: roomId,
+              examId: lobbySession.examId || 0,
+              examName: 'Bài thi nhóm',
+              hostRole: 'proctor',
+              roomCode: roomCode,
+              roomTitle: `Phòng thi: ${roomCode}`,
+              roomParticipants: mappedParticipants,
+              durationMinutes: lobbySession.durationMinutes || 15,
+            });
+            setCurrentView('home'); // it will render ProctorDashboard due to takingExamSession
+          }}
+          onExamStarted={(attemptId, examContent, isHostAttempt) => {
+            setTakingExamSession({
+              roomId: lobbySession.roomId,
+              roomCode: lobbySession.roomCode,
+              roomTitle: `Phòng thi: ${lobbySession.roomCode}`,
+              durationMinutes: lobbySession.durationMinutes || 15,
+              examId: examContent.exam_id,
+              examName: 'Bài thi nhóm',
+              attemptId: attemptId,
+              preFetchedQuestions: examContent.questions, // Pass directly
+              isHost: isHostAttempt || false,
+            });
+            setCurrentView('home');
+          }}
+          onLeave={() => {
+            setLobbySession(null);
+            setCurrentView('rooms');
+          }}
+        />
+        <ExamHistoryModal
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          currentUser={user}
         />
         <Footer />
       </div>
@@ -254,12 +364,15 @@ export const App: React.FC = () => {
   if (currentView === 'create_exam') {
     return (
       <div className="app-root">
+        {settingsToast && <div className="exam-toast">{settingsToast}</div>}
         <Navbar
           currentView={currentView}
           onNavigate={(view: any) => setCurrentView(view)}
           user={user}
           onOpenLogin={() => setCurrentView('login')}
           onLogout={handleLogout}
+          onOpenHistory={() => setShowHistoryModal(true)}
+          onOpenSettings={handleOpenSettings}
         />
         <main className="main-layout">
           <div className="container">
@@ -269,6 +382,11 @@ export const App: React.FC = () => {
             }} />
           </div>
         </main>
+        <ExamHistoryModal
+          isOpen={showHistoryModal}
+          onClose={() => setShowHistoryModal(false)}
+          currentUser={user}
+        />
         <Footer />
       </div>
     );
@@ -277,12 +395,15 @@ export const App: React.FC = () => {
   // Render Home view
   return (
     <div className="app-root">
+      {settingsToast && <div className="exam-toast">{settingsToast}</div>}
       <Navbar
         currentView={currentView}
         onNavigate={view => setCurrentView(view)}
         user={user}
         onOpenLogin={() => setCurrentView('login')}
         onLogout={handleLogout}
+        onOpenHistory={() => setShowHistoryModal(true)}
+        onOpenSettings={handleOpenSettings}
       />
 
       <main className="main-layout">
@@ -340,6 +461,12 @@ export const App: React.FC = () => {
         exam={activeModalExam}
         onClose={() => setActiveModalExam(null)}
         onStartExam={handleStartExamFromModal}
+      />
+
+      <ExamHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        currentUser={user}
       />
 
       <Footer />

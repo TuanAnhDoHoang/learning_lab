@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { CustomExamData, Question, Answer, ViolationRecord, ParticipantResult } from '..';
-import { fetchQuestions, fetchWithAuth } from '../api/apicaller';
+import { 
+  fetchQuestions, fetchWithAuth, saveAttemptAnswer,
+  fetchTimeAttemptEnd, fetchAttempt, scoreAttempt 
+} from '../api/apicaller';
 
 /* ── Types ── */
 interface QuestionWithAnswers {
@@ -21,7 +24,13 @@ interface ExamPageProps {
   enableAntiCheat?: boolean;
   roomParticipants?: string[];
   currentUser?: { username: string; email: string } | null;
+  attemptId?: number;
+  preFetchedQuestions?: QuestionWithAnswers[];
+  isHost?: boolean;
+  roomId?: number;
+  roomCode?: string;
   onBack: () => void;
+  onSwitchToProctor?: (remainingSeconds: number) => void;
 }
 
 export const ExamPage: React.FC<ExamPageProps> = ({
@@ -32,7 +41,12 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   enableAntiCheat = false,
   roomParticipants,
   currentUser,
+  attemptId,
+  preFetchedQuestions,
+  isHost = false,
+  roomId,
   onBack,
+  onSwitchToProctor,
 }) => {
   /* ── Data state ── */
   const [questionsData, setQuestionsData] = useState<QuestionWithAnswers[]>([]);
@@ -147,6 +161,12 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
   /* ── Fetch or initialize questions ── */
   useEffect(() => {
+    if (preFetchedQuestions && preFetchedQuestions.length > 0) {
+      setQuestionsData(preFetchedQuestions);
+      setLoading(false);
+      return;
+    }
+
     if (customExamData && customExamData.questions?.length > 0) {
       const formatted: QuestionWithAnswers[] = customExamData.questions.map((cq, idx) => ({
         question: {
@@ -176,6 +196,45 @@ export const ExamPage: React.FC<ExamPageProps> = ({
         .finally(() => setLoading(false));
     }
   }, [examId, customExamData]);
+
+  /* ── Server Clock Synchronization & Database Recovery ── */
+  useEffect(() => {
+    if (!attemptId || submitted) return;
+
+    // 1. Synchronize Server Countdown Time (Anti-cheat for local clock tampering)
+    fetchTimeAttemptEnd(attemptId)
+      .then((timeRes) => {
+        if (timeRes && timeRes.time_end && timeRes.now) {
+          const remainingSeconds = Math.max(0, timeRes.time_end - timeRes.now);
+          setTimeLeft(remainingSeconds);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not sync time from server:', err);
+      });
+
+    // 2. Fetch already answered questions from DB (Crash / Power Outage / F5 recovery)
+    fetchAttempt(attemptId)
+      .then((attemptRows) => {
+        if (attemptRows && Array.isArray(attemptRows) && attemptRows.length > 0 && questionsData.length > 0) {
+          setSelectedAnswers((prev) => {
+            const updated = { ...prev };
+            attemptRows.forEach((row, qIdx) => {
+              if (row.user_answer !== null && row.user_answer !== undefined) {
+                const matchedQ = questionsData[qIdx];
+                if (matchedQ && matchedQ.answers[row.user_answer]) {
+                  updated[matchedQ.question.id] = matchedQ.answers[row.user_answer].id;
+                }
+              }
+            });
+            return updated;
+          });
+        }
+      })
+      .catch(() => {
+        // ignore if not found
+      });
+  }, [attemptId, submitted, questionsData]);
 
   /* ── Fullscreen Activation ── */
   const requestFullscreenMode = useCallback(() => {
@@ -427,9 +486,21 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   };
 
   /* ── Select answer ── */
-  const handleSelectAnswer = (questionId: number, answerId: number) => {
+  const handleSelectAnswer = async (questionId: number, answerId: number) => {
     if (submitted) return;
     setSelectedAnswers(prev => ({ ...prev, [questionId]: answerId }));
+
+    if (attemptId && isOnline) {
+      try {
+        await saveAttemptAnswer({
+          exam_attempt_id: attemptId,
+          question_id: questionId,
+          answer_id: answerId,
+        });
+      } catch (err) {
+        console.warn('Failed to save answer to server for room attempt', err);
+      }
+    }
   };
 
   /* ── Navigate questions ── */
@@ -442,15 +513,12 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   /* ── Generate Room Leaderboard after exam finishes ── */
   const generateRoomLeaderboard = useCallback((myScore: number, myTotal: number, myViolations: ViolationRecord[], disqualified: boolean) => {
     const timeSpent = totalDurationSeconds - timeLeft;
-    const participantsList = roomParticipants && roomParticipants.length > 0
-      ? roomParticipants
-      : [currentUsername, 'Nguyễn Văn A (Demo)', 'Trần Thị B (Demo)', 'Lê Hoàng C (Demo)'];
 
     // Current user's result
     const myResult: ParticipantResult = {
       name: currentUsername,
       isCurrentUser: true,
-      isHost: true,
+      isHost: isHost || false,
       score: disqualified ? 0 : myScore,
       total: myTotal,
       timeSpentSeconds: timeSpent,
@@ -459,38 +527,24 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       status: disqualified ? 'disqualified' : timeLeft <= 0 ? 'time_out' : 'submitted',
     };
 
-    // Generate realistic simulated results for other participants
-    const otherResults: ParticipantResult[] = participantsList
+    // Only include other participants if roomParticipants is explicitly provided
+    const otherResults: ParticipantResult[] = (roomParticipants || [])
       .filter(p => p !== currentUsername)
-      .map((pName, idx) => {
-        const simScore = Math.max(0, Math.min(myTotal, Math.round(myTotal * (0.6 + (idx * 0.15) % 0.4))));
-        const simTimeSpent = Math.min(totalDurationSeconds, Math.round(timeSpent * (0.8 + idx * 0.25)));
-        const simViolationsCount = idx === 1 ? 1 : idx === 2 ? 2 : 0;
-        const simViolationsList: ViolationRecord[] = simViolationsCount > 0
-          ? [
-              {
-                id: 1,
-                type: 'tab_switch',
-                message: 'Rời khỏi tab thi hoặc chuyển ứng dụng khác',
-                timestamp: '15:20:12',
-              },
-            ]
-          : [];
-
+      .map((pName) => {
         return {
           name: pName,
           isCurrentUser: false,
           isHost: false,
-          score: simScore,
+          score: 0,
           total: myTotal,
-          timeSpentSeconds: simTimeSpent,
-          violationsCount: simViolationsCount,
-          violationsList: simViolationsList,
+          timeSpentSeconds: 0,
+          violationsCount: 0,
+          violationsList: [],
           status: 'submitted',
         };
       });
 
-    const allResults = [myResult, ...otherResults];
+    const allResults = otherResults.length > 0 ? [myResult, ...otherResults] : [myResult];
 
     // Sort by: score (desc), timeSpent (asc), violations (asc)
     allResults.sort((a, b) => {
@@ -502,7 +556,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     });
 
     setRoomLeaderboard(allResults);
-  }, [totalDurationSeconds, timeLeft, roomParticipants, currentUsername]);
+  }, [totalDurationSeconds, timeLeft, roomParticipants, currentUsername, isHost]);
 
   /* ── Submit exam (Online / Offline resilient) ── */
   const handleSubmit = useCallback(async (forcedDisqualified = false) => {
@@ -551,26 +605,50 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
       if (navigator.onLine) {
         // Client-side Jitter: If auto-submitting on timeout (00:00), add a short randomized delay (100ms - 1000ms)
-        // to smooth out backend load spikes when multiple participants submit at the exact same second.
         if (timeLeft <= 0) {
           const jitterMs = Math.floor(Math.random() * 900) + 100;
           await new Promise(resolve => setTimeout(resolve, jitterMs));
         }
 
-        try {
-          const res = await fetchWithAuth('/api/score', {
-            method: 'POST',
-            body: JSON.stringify(payload),
-          });
-          if (res.ok) {
-            const result = await res.json();
-            finalScore = result.score;
+        // If attemptId exists, score via score_attempt to persist mark into database
+        if (attemptId) {
+          try {
+            const scoreRes = await scoreAttempt(attemptId);
+            finalScore = scoreRes.score;
             setIsOfflineSubmitted(false);
+          } catch (scoreErr) {
+            console.warn('scoreAttempt failed, trying /api/score:', scoreErr);
+            try {
+              const res = await fetchWithAuth('/api/score', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+              });
+              if (res.ok) {
+                const result = await res.json();
+                finalScore = result.score;
+                setIsOfflineSubmitted(false);
+              }
+            } catch {
+              setIsOfflineSubmitted(true);
+              finalScore = Math.round(totalQ * 0.7);
+            }
           }
-        } catch {
-          // Network error during submit -> save pending sync
-          setIsOfflineSubmitted(true);
-          finalScore = Math.round(totalQ * 0.7); // Fallback estimate until sync
+        } else {
+          try {
+            const res = await fetchWithAuth('/api/score', {
+              method: 'POST',
+              body: JSON.stringify(payload),
+            });
+            if (res.ok) {
+              const result = await res.json();
+              finalScore = result.score;
+              setIsOfflineSubmitted(false);
+            }
+          } catch {
+            // Network error during submit -> save pending sync
+            setIsOfflineSubmitted(true);
+            finalScore = Math.round(totalQ * 0.7); // Fallback estimate until sync
+          }
         }
       } else {
         // Offline submit mode
@@ -684,14 +762,14 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       {/* ── Offline Status Banner ── */}
       {!isOnline && (
         <div className="network-offline-banner">
-          <span>⚠️ Mất kết nối Internet. Bài làm đang được tự động lưu trên thiết bị của bạn. Bạn vẫn có thể tiếp tục làm bài bình thường.</span>
+          <span>Mất kết nối Internet. Bài làm đang được tự động lưu trên thiết bị của bạn. Bạn vẫn có thể tiếp tục làm bài bình thường.</span>
         </div>
       )}
 
       {/* ── Reconnected Online Notification Banner ── */}
       {showReconnectedAlert && isOnline && (
         <div className="network-online-banner">
-          <span>✅ Đã khôi phục kết nối Internet. Tiến trình làm bài đã được đồng bộ an toàn!</span>
+          <span>Đã khôi phục kết nối Internet. Tiến trình làm bài đã được đồng bộ an toàn!</span>
         </div>
       )}
 
@@ -774,11 +852,15 @@ export const ExamPage: React.FC<ExamPageProps> = ({
             } else {
               isExamActiveRef.current = false;
               exitFullscreenMode();
-              onBack();
+              if (isHost && roomId && onSwitchToProctor) {
+                onSwitchToProctor(timeLeft);
+              } else {
+                onBack();
+              }
             }
           }}
         >
-          ← Thoát
+          {isHost && roomId ? 'Giám sát phòng' : 'Thoát'}
         </button>
 
         <div className="exam-title-center">
@@ -870,14 +952,14 @@ export const ExamPage: React.FC<ExamPageProps> = ({
                   disabled={currentIndex === 0}
                   onClick={() => goToQuestion(currentIndex - 1)}
                 >
-                  ← Câu trước
+                  Câu trước
                 </button>
                 <button
                   className="btn-nav btn-nav-next"
                   disabled={currentIndex === questionsData.length - 1}
                   onClick={() => goToQuestion(currentIndex + 1)}
                 >
-                  Câu tiếp →
+                  Câu tiếp
                 </button>
               </div>
             </>
@@ -1026,9 +1108,29 @@ export const ExamPage: React.FC<ExamPageProps> = ({
 
               {/* Action Buttons */}
               <div className="result-actions-row">
-                <button className="btn-primary result-back-btn" onClick={onBack}>
-                  ← Quay về Phòng thi
-                </button>
+                {isHost && roomId && onSwitchToProctor ? (
+                  <button
+                    className="btn-primary result-back-btn"
+                    onClick={() => {
+                      isExamActiveRef.current = false;
+                      exitFullscreenMode();
+                      onSwitchToProctor(timeLeft);
+                    }}
+                  >
+                    Trở lại phòng thi
+                  </button>
+                ) : (
+                  <button
+                    className="btn-primary result-back-btn"
+                    onClick={() => {
+                      isExamActiveRef.current = false;
+                      exitFullscreenMode();
+                      onBack();
+                    }}
+                  >
+                    Quay về Phòng thi
+                  </button>
+                )}
               </div>
             </div>
           )}
