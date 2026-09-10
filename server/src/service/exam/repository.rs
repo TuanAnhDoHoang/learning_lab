@@ -52,11 +52,14 @@ pub fn create_exam_from_parsed_questions(
             answer_ids.push(created_answer.id);
         }
 
-        let right_index = payload.answers.get(question_index).copied().unwrap_or(0) as usize;
-        let right_answer_id = answer_ids
-            .get(right_index)
-            .copied()
-            .ok_or_else(|| anyhow!("Chỉ số câu trả lời đúng (right_answer) không hợp lệ!"))?;
+        let Some(right_index) = payload.answers.get(question_index).copied() else {
+            continue;
+        };
+
+        let right_index = right_index as usize;
+        let Some(right_answer_id) = answer_ids.get(right_index).copied() else {
+            continue;
+        };
 
         new_answer_map(created_question.id, right_answer_id, conn)?;
     }

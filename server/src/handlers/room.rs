@@ -141,6 +141,7 @@ pub async fn room_scores(
                 score: Some(ScoreResp {
                     score: score as u32,
                     sum_of_question: total as u32,
+                    question_no_answer: vec![],
                 }),
             }),
             Ok(None) => members.push(MemberScore {
@@ -201,6 +202,7 @@ pub async fn room_member_score(
             score: Some(ScoreResp {
                 score: score as u32,
                 sum_of_question: total as u32,
+                question_no_answer: vec![],
             }),
         })),
         Ok(None) => Ok(Json(MemberScore {
@@ -232,6 +234,7 @@ pub async fn my_room_score(
             score: Some(ScoreResp {
                 score: score as u32,
                 sum_of_question: total as u32,
+                question_no_answer: vec![],
             }),
         })),
         Ok(None) => Ok(Json(MemberScore {
@@ -354,7 +357,7 @@ pub async fn close_room(
 
             // if mark is None (i.e., not yet scored), perform scoring
             if let Some(None) = mark_opt {
-                crate::service::exam_attempt::score_and_save_attempt(attempt_id, *uid, &mut conn)
+                let _ = crate::service::exam_attempt::score_and_save_attempt(attempt_id, *uid, &mut conn)
                     .map_err(|e| {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,

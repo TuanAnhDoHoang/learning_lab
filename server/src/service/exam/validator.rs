@@ -18,10 +18,6 @@ pub fn validate_exam_payload(payload: &CreateExamByImageRequest) -> Result<(), S
         return Err("duration must be greater than 0".to_string());
     }
 
-    if payload.answers.is_empty() {
-        return Err("answers list is required".to_string());
-    }
-
     Ok(())
 }
 

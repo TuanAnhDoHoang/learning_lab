@@ -1,16 +1,15 @@
 use axum::{extract::State, http::StatusCode, Json};
-use diesel::Connection;
+use diesel::{Connection, ExpressionMethods, OptionalExtension, RunQueryDsl};
+use diesel::query_dsl::methods::{FilterDsl, SelectDsl};
 
 use crate::{
+    AppState,
     service::{
-        answer::get_one_answer,
-        answer_map::get_answer_map,
         exam::check_exam_exist,
-        question::get_one_question,
         score::{DoScoreRequest, Score},
     },
-    AppState,
 };
+
 pub async fn handle_score(
     State(app_state): State<AppState>,
     Json(req): Json<DoScoreRequest>,
@@ -22,69 +21,53 @@ pub async fn handle_score(
         )
     })?;
 
-    let question_req = req.questions.clone();
-    let sum_of_question = question_req.len();
-    for q in question_req.clone().into_iter() {
-        if q.right_answer >= q.answers.len() {
-            return Err((
-                StatusCode::BAD_REQUEST,
-                format!(
-                    "Right answer out of answers {:?} || {}",
-                    q.answers.clone(),
-                    q.right_answer
-                ),
-            ));
-        }
-    }
+    let total_questions = req.questions.len() as u32;
+    let mut correct_count = 0u32;
+    let mut question_no_answer = Vec::new();
 
-    let mut score: u32 = 0; //per 100
     conn.transaction::<_, diesel::result::Error, _>(|conn| {
-        let conn = &mut *conn;
         let exam_id = req.exam_id;
 
-        let exam_exist = check_exam_exist(exam_id, conn).map_err(|e| {
-            eprintln!("Error during check exam id is exist: {}", e);
+        let exam_exists = check_exam_exist(exam_id, conn).map_err(|e| {
+            eprintln!("Error during check exam id: {}", e);
             diesel::result::Error::NotFound
         })?;
-        if !exam_exist {
+
+        if !exam_exists {
             return Err(diesel::result::Error::NotFound);
         }
 
-        for q in question_req.into_iter() {
-            let question_content = q.question;
-            let answers = q.answers.clone();
-            let predict_answer = answers.get(q.right_answer).unwrap();
-            let question_exist =
-                get_one_question(exam_id, &question_content, conn).map_err(|e| {
-                    eprintln!("Error during check question by exam id is exist: {}", e);
-                    diesel::result::Error::RollbackTransaction
-                })?;
+        for q in &req.questions {
+            let question_id = crate::schema::question::table
+                .filter(crate::schema::question::id.eq(q.question_id))
+                .filter(crate::schema::question::exam_id.eq(exam_id))
+                .select(crate::schema::question::id)
+                .first::<i32>(conn)
+                .map_err(|_| diesel::result::Error::NotFound)?;
 
-            let answer_map = get_answer_map(question_exist.id, conn).map_err(|e| {
-                eprintln!("Error during check answer map by answer id is exist: {}", e);
-                diesel::result::Error::RollbackTransaction
-            })?;
+            let correct_answer_id = crate::schema::answer_map::table
+                .filter(crate::schema::answer_map::question_id.eq(question_id))
+                .select(crate::schema::answer_map::answer_id)
+                .first::<i32>(conn)
+                .optional()
+                .map_err(|_| diesel::result::Error::NotFound)?;
 
-            for a in q.answers {
-                let answer_exist =
-                    get_one_answer(question_exist.id, a.as_str(), conn).map_err(|e| {
-                        eprintln!("Error during check answer by question id is exist: {}", e);
-                        diesel::result::Error::RollbackTransaction
-                    })?;
-                if answer_exist.content == predict_answer.clone().to_owned()
-                    && answer_map.answer_id == answer_exist.id
-                {
-                    score += 1;
+            match correct_answer_id {
+                Some(correct_answer_id) if correct_answer_id == q.answer_id => {
+                    correct_count += 1;
                 }
+                None => {
+                    question_no_answer.push(question_id);
+                }
+                _ => {}
             }
         }
+
         Ok(())
     })
     .map_err(|e| {
         let err_msg = if e == diesel::result::Error::NotFound {
-            "Invalid exam id".to_string()
-        } else if e == diesel::result::Error::NotFound {
-            "Invalid question or answers".to_string()
+            "Invalid exam id or question id".to_string()
         } else {
             format!("Transaction failed! All changes rolled back. Error: {}", e)
         };
@@ -92,15 +75,9 @@ pub async fn handle_score(
         (StatusCode::BAD_REQUEST, err_msg)
     })?;
 
-    if score <= sum_of_question as u32 {
-        Ok(Json(Score {
-            score,
-            sum_of_question: sum_of_question as u32,
-        }))
-    } else {
-        Err((
-            StatusCode::BAD_REQUEST,
-            "Error during scoring exam".to_string(),
-        ))
-    }
+    Ok(Json(Score {
+        score: correct_count,
+        sum_of_question: total_questions,
+        question_no_answer,
+    }))
 }

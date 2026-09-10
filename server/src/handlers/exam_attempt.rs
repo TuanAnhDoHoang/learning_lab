@@ -188,7 +188,7 @@ pub async fn attempt_score(
     })?;
 
     // compute score and persist via service (service enforces ownership)
-    let (correct_count, total_questions) =
+    let (correct_count, total_questions, question_no_answer) =
         match crate::service::exam_attempt::score_and_save_attempt(
             query.exam_attempt_id,
             user.id,
@@ -213,6 +213,7 @@ pub async fn attempt_score(
     Ok(Json(Score {
         score: correct_count,
         sum_of_question: total_questions,
+        question_no_answer,
     }))
 }
 

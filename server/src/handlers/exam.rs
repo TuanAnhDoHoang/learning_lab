@@ -15,8 +15,8 @@ use crate::{
         domain::{get_existed_domain, new_domain},
         exam::{
             CreateExamRequest, CreateExamResponse, create_exam_from_parsed_questions,
-            extract_exam_payload_and_image, new_exam, validate_answer_count,
-            validate_answer_index, validate_exam_payload,
+            extract_exam_payload_and_image, new_exam, validate_answer_index,
+            validate_exam_payload,
         },
         question::new_question,
     },
@@ -103,8 +103,6 @@ pub async fn create_new_exam(
                         format!("Error during create new answer map {}", e).into(),
                     )
                 })?;
-            } else {
-                return Err(diesel::result::Error::NotFound);
             }
         }
 
@@ -179,21 +177,31 @@ pub async fn create_new_exam_by_image(
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("Error during parse image {}", e)))?;
 
-    if let Err(_) = validate_answer_count(payload.answers.len(), parsed.len()) {
-        return handle_invalid_answer_count(payload.answers.len(), parsed.len()).await;
-    }
+    // if let Err(_) = validate_answer_count(payload.answers.len(), parsed.len()) {
+    //     return handle_invalid_answer_count(payload.answers.len(), parsed.len()).await;
+    // }
 
     let mut new_exam_id = 0;
+
+    if payload.answers.len() > parsed.len() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!(
+                "Số lượng câu trả lời đúng ({}) không được nhiều hơn số lượng câu hỏi ({}).",
+                payload.answers.len(),
+                parsed.len()
+            ),
+        ));
+    }
 
     conn.transaction::<_, diesel::result::Error, _>(|conn| {
         let conn = &mut *conn;
 
         for (index, question) in parsed.iter().enumerate() {
-            validate_answer_index(
-                payload.answers.get(index).copied().unwrap_or(0) as usize,
-                question.answers.len(),
-            )
-            .map_err(|message| diesel::result::Error::NotFound)?;
+            if let Some(&selected_index) = payload.answers.get(index) {
+                validate_answer_index(selected_index as usize, question.answers.len())
+                    .map_err(|_| diesel::result::Error::NotFound)?;
+            }
         }
 
         let exam_id = create_exam_from_parsed_questions(conn, &payload, &parsed)

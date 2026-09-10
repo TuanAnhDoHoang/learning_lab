@@ -86,8 +86,8 @@ pub fn score_and_save_attempt(
     exam_attempt_id: i32,
     user_id: i32,
     conn: &mut PgConnection,
-) -> Result<(u32, u32), diesel::result::Error> {
-    conn.transaction::<(u32, u32), diesel::result::Error, _>(|conn| {
+) -> Result<(u32, u32, Vec<i32>), diesel::result::Error> {
+    conn.transaction::<(u32, u32, Vec<i32>), diesel::result::Error, _>(|conn| {
         // ensure the attempt belongs to the provided user
         let attempt = exam_attempt::table
             .filter(exam_attempt::id.eq(exam_attempt_id))
@@ -100,12 +100,14 @@ pub fn score_and_save_attempt(
 
         let total_questions = questions.len() as u32;
         let mut correct_count = 0u32;
+        let mut question_no_answer = Vec::new();
 
         for q in questions {
             let right_answer_id = answer_map::table
                 .filter(answer_map::question_id.eq(q.id))
                 .select(answer_map::answer_id)
-                .get_result::<i32>(conn)?;
+                .first::<i32>(conn)
+                .optional()?;
 
             let user_answer_id = answer_history::table
                 .filter(answer_history::exam_attempt_id.eq(exam_attempt_id))
@@ -115,8 +117,15 @@ pub fn score_and_save_attempt(
                 .first::<i32>(conn)
                 .optional()?;
 
-            if user_answer_id == Some(right_answer_id) {
-                correct_count += 1;
+            match right_answer_id {
+                Some(right_answer_id) => {
+                    if user_answer_id == Some(right_answer_id) {
+                        correct_count += 1;
+                    }
+                }
+                None => {
+                    question_no_answer.push(q.id);
+                }
             }
         }
 
@@ -127,7 +136,7 @@ pub fn score_and_save_attempt(
             ))
             .execute(conn)?;
 
-        Ok((correct_count, total_questions))
+        Ok((correct_count, total_questions, question_no_answer))
     })
 }
 

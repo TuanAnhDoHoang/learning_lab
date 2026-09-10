@@ -1,5 +1,6 @@
 use reqwest::Client;
 mod helpers;
+use crate::helpers::send_json;
 use helpers::TestServer;
 use helpers::{auth, exam, room};
 
@@ -55,15 +56,15 @@ async fn all_routes_true_logic_test() {
     let user2_email = "user2@gmail.com".to_string();
     let user3_email = "user3@gmail.com".to_string();
 
-    // let _ = register_user(&client, &user1_email, "user1", "Pass#1234").await;
+    let _ = register_user(&client, &user1_email, "user1", "Pass#1234").await;
     let login1 = auth::login_user(&client, &user1_email, "Pass#1234").await;
     let token1 = login1["access_token"].as_str().unwrap().to_string();
 
-    // let _ = register_user(&client, &user2_email, "user2", "Pass#1234").await;
+    let _ = register_user(&client, &user2_email, "user2", "Pass#1234").await;
     let login2 = auth::login_user(&client, &user2_email, "Pass#1234").await;
     let token2 = login2["access_token"].as_str().unwrap().to_string();
 
-    // let _ = register_user(&client, &user3_email, "user3", "Pass#1234").await;
+    let _ = register_user(&client, &user3_email, "user3", "Pass#1234").await;
     let login3 = auth::login_user(&client, &user3_email, "Pass#1234").await;
     let token3 = login3["access_token"].as_str().unwrap().to_string();
 
@@ -154,6 +155,36 @@ async fn all_routes_true_logic_test() {
     let _ = room::delete_room(&client, &admin_token, room_id).await;
 
     println!("\n[INFO] All route validation helpers completed successfully.");
+}
+
+#[tokio::test]
+async fn create_exam_accepts_partial_right_answers() {
+    let _server = TestServer::start().await;
+    let client = Client::new();
+
+    let admin_login =
+        auth::login_user(&client, helpers::ADMIN_EMAIL, helpers::ADMIN_PASSWORD).await;
+    let admin_token = admin_login["access_token"].as_str().unwrap().to_string();
+
+    let result = send_json(
+        "POST /api/new_exam",
+        &client,
+        reqwest::Method::POST,
+        "/api/new_exam",
+        Some(serde_json::json!({
+            "exam_name": "Exam partial answer",
+            "domain": "Partial Domain",
+            "duration": 20,
+            "questions": [
+                {"question": "Câu hỏi 1", "answers": ["A", "B", "C"], "right_answer": 1},
+                {"question": "Câu hỏi 2", "answers": ["X", "Y"], "right_answer": 99}
+            ]
+        })),
+        Some(&admin_token),
+    )
+    .await;
+
+    assert!(result.get("exam_id").is_some(), "exam should still be created when some right_answer entries are missing or invalid: {:?}", result);
 }
 
 #[tokio::test]
