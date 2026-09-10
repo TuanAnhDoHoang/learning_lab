@@ -4,6 +4,7 @@ use axum::{
 };
 
 use super::types::CreateExamByImageRequest;
+use infer;
 
 /// Reads a multipart exam upload and extracts both the JSON payload and the image file.
 ///
@@ -73,21 +74,37 @@ async fn save_uploaded_image(field: Field<'_>) -> Result<String, (StatusCode, St
         .bytes()
         .await
         .map_err(|e| (StatusCode::BAD_REQUEST, format!("reading uploaded file bytes: {}", e)))?;
-
+    // Enforce size limit to mitigate DoS via huge uploads
     const MAX_SIZE: usize = 1 * 1024 * 1024; // 1MB
     if data.len() > MAX_SIZE {
         return Err((StatusCode::BAD_REQUEST, "uploaded file is too large (max 1MB)".to_string()));
     }
 
+    // Verify file signature (magic bytes) to ensure it's an image
+    let detected = infer::get(&data);
+    let detected_type = if let Some(t) = detected {
+        t
+    } else {
+        return Err((StatusCode::BAD_REQUEST, "uploaded file is not a recognized image".to_string()));
+    };
+
+    if !detected_type.mime_type().starts_with("image/") {
+        return Err((StatusCode::BAD_REQUEST, "uploaded file is not an image".to_string()));
+    }
+
     let uid = uuid::Uuid::new_v4().to_string();
     let path = std::path::Path::new(&orig_name);
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
-    let ext = path.extension().and_then(|s| s.to_str());
-    let out_name = if let Some(ext) = ext {
-        format!("{}-{}.{}", stem, uid, ext)
-    } else {
-        format!("{}-{}", stem, uid)
-    };
+
+    // Sanitize stem to avoid any path traversal or weird characters
+    let stem_sanitized: String = stem
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '_' || c == '-' { c } else { '_' })
+        .collect();
+
+    // Prefer extension detected from bytes; fallback to uploaded extension if any
+    let ext = detected_type.extension();
+    let out_name = format!("{}-{}.{}", stem_sanitized, uid, ext);
 
     let mut out_path = std::path::PathBuf::from("/tmp/learning_lab");
     tokio::fs::create_dir_all(&out_path)
