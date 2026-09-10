@@ -10,3 +10,4 @@ pub mod exam_attempt;
 pub mod answer_history;
 pub mod room;
 pub mod room_member;
+pub mod multipart;

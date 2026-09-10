@@ -20,7 +20,7 @@ use crate::{
     },
     AppState,
 };
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
 
 pub async fn create_room(
     State(app_state): State<AppState>,

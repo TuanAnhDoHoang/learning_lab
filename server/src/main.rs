@@ -16,7 +16,7 @@ use tower_http::cors::{Any, CorsLayer}; // Import các module r2d2
 use crate::{
     handlers::{
         answer_history::save_attempt_answer,
-        exam::{create_new_exam, get_exams},
+        exam::{create_new_exam, get_exams, create_new_exam_by_image},
         exam_attempt::{attempt_score, create_exam_attempt, get_attempt, get_time_attempt_end, create_exam_attempt_by_room},
         question::get_question,
         room::{close_room, create_room, delete_room, start_room},
@@ -75,6 +75,7 @@ async fn main() -> anyhow::Result<()> {
 
     let api_routes = Router::new()
         .route("/new_exam", post(create_new_exam))
+        .route("/new_exam_by_image", post(create_new_exam_by_image))
         .route("/questions", get(get_question))
         .route("/score", post(handle_score))
         .route("/start_exam_attempt", post(create_exam_attempt))

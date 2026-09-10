@@ -6,8 +6,9 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.104"
 async-trait = "0.1.92"
-axum = "0.8.9"
+axum = {version="0.8.9", features=["multipart"]}
 axum-extra ={ version="0.12.6", features=["cookie"]}
+base64 = "0.23.1"
 bcrypt = "0.19.3"
 chrono = "0.4.45"
 diesel = { version = "2.3.11", features = ["postgres", "r2d2", "chrono"] }
@@ -17,6 +18,7 @@ dotenv = "0.15.0"
 hex = "0.4.3"
 jsonwebtoken = { version = "11", default-features = false, features = ["rust_crypto"] }
 regex = "1.13.1"
+reqwest = {version = "0.12", features=["multipart"]}
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 sha2 = "0.11.0"

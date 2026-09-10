@@ -1,23 +1,43 @@
-use axum::{extract::State, http::StatusCode, Extension, Json};
+use axum::{
+    Extension, Json,
+    extract::{Multipart, State},
+    http::StatusCode,
+};
 use diesel::{Connection, RunQueryDsl};
 
 use crate::{
+    AppState,
     postgres::schema::{Exam, Users},
     schema::exam,
     service::{
         answer::new_answer,
         answer_map::new_answer_map,
         domain::{get_existed_domain, new_domain},
-        exam::{new_exam, CreateExamRequest, CreateExamResponse},
+        exam::{
+            CreateExamRequest, CreateExamResponse, create_exam_from_parsed_questions,
+            extract_exam_payload_and_image, new_exam, validate_answer_count,
+            validate_answer_index, validate_exam_payload,
+        },
         question::new_question,
-        users::ROLE,
     },
-    AppState,
 };
+
+async fn handle_invalid_answer_count(
+    payload_answers_len: usize,
+    question_count: usize,
+) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
+    Err((
+        StatusCode::BAD_REQUEST,
+        format!(
+            "Số lượng câu trả lời đúng ({}) không khớp với số lượng câu hỏi ({}).",
+            payload_answers_len, question_count
+        ),
+    ))
+}
 
 pub async fn create_new_exam(
     State(app_state): State<AppState>,
-    Extension(user): Extension<Users>,
+    Extension(_user): Extension<Users>,
     Json(payload): Json<CreateExamRequest>,
 ) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
     let mut conn = app_state.db_pool.get().map_err(|e| {
@@ -26,18 +46,6 @@ pub async fn create_new_exam(
             format!("Can not connect to database: {}", e),
         )
     })?;
-
-    let check_user_role = match user.role {
-        ROLE::ADMIN => true,
-        _ => false,
-    };
-
-    if !check_user_role {
-        return Err((
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "You have no permission".to_string(),
-        ));
-    }
 
     let mut new_exam_id = 0;
 
@@ -126,6 +134,7 @@ pub async fn create_new_exam(
         }))
     }
 }
+
 pub async fn get_exams(
     State(app_state): State<AppState>,
 ) -> anyhow::Result<Json<Vec<Exam>>, (StatusCode, String)> {
@@ -144,4 +153,71 @@ pub async fn get_exams(
     })?;
 
     Ok(Json(all_exam))
+}
+
+pub async fn create_new_exam_by_image(
+    State(app_state): State<AppState>,
+    Extension(_user): Extension<Users>,
+    mut multipart: Multipart,
+) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+
+    let (payload, image_path) = extract_exam_payload_and_image(&mut multipart)
+        .await
+        .map_err(|(code, message)| (code, message))?;
+
+    validate_exam_payload(&payload).map_err(|message| {
+        (StatusCode::BAD_REQUEST, message)
+    })?;
+
+    let parsed = crate::utils::ocr::parse_image(std::path::Path::new(&image_path))
+        .await
+        .map_err(|e| (StatusCode::BAD_REQUEST, format!("Error during parse image {}", e)))?;
+
+    if let Err(_) = validate_answer_count(payload.answers.len(), parsed.len()) {
+        return handle_invalid_answer_count(payload.answers.len(), parsed.len()).await;
+    }
+
+    let mut new_exam_id = 0;
+
+    conn.transaction::<_, diesel::result::Error, _>(|conn| {
+        let conn = &mut *conn;
+
+        for (index, question) in parsed.iter().enumerate() {
+            validate_answer_index(
+                payload.answers.get(index).copied().unwrap_or(0) as usize,
+                question.answers.len(),
+            )
+            .map_err(|message| diesel::result::Error::NotFound)?;
+        }
+
+        let exam_id = create_exam_from_parsed_questions(conn, &payload, &parsed)
+            .map_err(|e| diesel::result::Error::QueryBuilderError(format!("{}", e).into()))?;
+
+        new_exam_id = exam_id;
+        Ok(())
+    })
+    .map_err(|e| {
+        let err_msg = if e == diesel::result::Error::NotFound {
+            "Chỉ số câu trả lời đúng (right_answer) không hợp lệ!".to_string()
+        } else {
+            format!("Transaction failed! All changes rolled back. Error: {}", e)
+        };
+
+        (StatusCode::BAD_REQUEST, err_msg)
+    })?;
+
+    if new_exam_id == 0 {
+        Err((
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "Error during creating new exam".to_string(),
+        ))
+    } else {
+        Ok(Json(CreateExamResponse { exam_id: new_exam_id }))
+    }
 }

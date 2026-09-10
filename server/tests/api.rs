@@ -134,3 +134,44 @@ async fn all_routes_true_logic_test() {
 
     println!("\n[INFO] All route validation helpers completed successfully.");
 }
+
+
+#[tokio::test]
+#[ignore]
+async fn create_exam_by_image_route_test() {
+    let _server = TestServer::start().await;
+    let client = Client::new();
+
+    // login admin
+    let admin_login = auth::login_user(&client, helpers::ADMIN_EMAIL, helpers::ADMIN_PASSWORD).await;
+    let admin_token = admin_login["access_token"].as_str().unwrap().to_string();
+
+    // use real test image from repository root
+    let img_bytes = std::fs::read("History_Exam.jpg").expect("failed to read test image History_Exam.jpg");
+
+    let payload = serde_json::json!({
+        "exam_name": "Image Exam",
+        "domain": "Test Domain",
+        "answers": [0,1],
+        "duration": 10
+    });
+
+    let form = reqwest::multipart::Form::new()
+        .part("file", reqwest::multipart::Part::bytes(img_bytes)
+            .file_name("test.jpg")
+            .mime_str("image/jpeg").unwrap())
+        .part("payload", reqwest::multipart::Part::text(payload.to_string())
+            .mime_str("application/json").unwrap());
+
+    let resp = client.post(format!("{}/api/new_exam_by_image", helpers::BASE_URL))
+        .header("Authorization", format!("Bearer {}", admin_token))
+        .multipart(form)
+        .send()
+        .await
+        .expect("request failed");
+
+    // this test is ignored by default because it may call external services
+    // assert we got a response (success or client error depending on env)
+    assert!(resp.status().is_success());
+    println!("[PASS] POST /api/new_exam_by_image -> success")
+}

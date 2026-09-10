@@ -5,7 +5,7 @@ use reqwest::{Client, StatusCode};
 use serde_json::Value;
 
 pub const BASE_URL: &str = "http://127.0.0.1:3000";
-pub const ADMIN_EMAIL: &str = "anhdoo1211@gmail.com";
+pub const ADMIN_EMAIL: &str = "anhdoo@gmail.com";
 pub const ADMIN_PASSWORD: &str = "Anhdoo#1004";
 
 pub struct TestServer {
