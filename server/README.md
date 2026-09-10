@@ -79,6 +79,7 @@ Test này kiểm tra luồng nghiệp vụ thực tế của hệ thống từ l
 
 #### 3) Exam / question / score
 - `POST /api/new_exam` — tạo bài thi mới (chỉ admin)
+- `POST /api/new_exam_by_image` — tạo bài thi mới từ ảnh bằng OCR, nhận multipart gồm `payload` JSON và file ảnh
 - `GET /api/questions?exam_id=<id>` — lấy danh sách câu hỏi và đáp án theo exam_id
 - `POST /api/score` — chấm điểm bài thi theo payload truyền lên (không khuyên dùng)
 - `POST /api/start_exam_attempt` — bắt đầu lượt làm bài, trả về `exam_attempt_id` và nội dung bài thi
