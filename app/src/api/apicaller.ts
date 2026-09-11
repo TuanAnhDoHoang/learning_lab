@@ -45,8 +45,9 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
     }
   }
 
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
     ...(options.headers as Record<string, string>),
   };
 
@@ -90,7 +91,93 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 }
 
 /* ── API Endpoints ── */
-import { CreateExamPayload } from '../index';
+import { CreateExamPayload, CreateExamByImagePayload } from '../index';
+
+// Compress image to ensure it is under 1MB for backend upload
+export async function compressImage(file: File, maxSizeBytes = 950000): Promise<File> {
+  if (file.size <= maxSizeBytes) {
+    return file;
+  }
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => resolve(file);
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      // Max dimension 1800px to maintain high OCR clarity
+      const maxDim = 1800;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(file);
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            resolve(file);
+            return;
+          }
+          const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+            type: 'image/jpeg',
+            lastModified: Date.now(),
+          });
+          resolve(compressedFile);
+        },
+        'image/jpeg',
+        0.85
+      );
+    };
+
+    img.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Create a new exam by image via AI OCR
+export async function createExamByImage(
+  payload: CreateExamByImagePayload,
+  file: File
+): Promise<{ exam_id: number }> {
+  const optimizedFile = await compressImage(file);
+  const formData = new FormData();
+  formData.append('payload', JSON.stringify(payload));
+  formData.append('image', optimizedFile);
+
+  const res = await fetchWithAuth(`${API_BASE}/new_exam_by_image`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorMsg = await res.text().catch(() => res.statusText);
+    throw new Error(errorMsg || 'Không thể tạo đề thi từ ảnh');
+  }
+  return res.json();
+}
 
 // Create a new exam
 export async function createExam(payload: CreateExamPayload) {

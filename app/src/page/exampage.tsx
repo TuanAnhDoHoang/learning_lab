@@ -588,19 +588,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       // Backend scoring payload
       const payload = {
         exam_id: examId,
-        questions: questionsData.map(qa => {
-          const answerContents = qa.answers.map(a => a.content);
-          const selectedAnswerId = selectedAnswers[qa.question.id];
-          const selectedIdx = selectedAnswerId
-            ? qa.answers.findIndex(a => a.id === selectedAnswerId)
-            : 0;
-
-          return {
-            question: qa.question.content,
-            answers: answerContents,
-            right_answer: selectedIdx >= 0 ? selectedIdx : 0,
-          };
-        }),
+        questions: questionsData.map(qa => ({
+          question_id: qa.question.id,
+          answer_id: selectedAnswers[qa.question.id] || 0,
+        })),
       };
 
       if (navigator.onLine) {
@@ -698,19 +689,10 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     try {
       const payload = {
         exam_id: examId,
-        questions: questionsData.map(qa => {
-          const answerContents = qa.answers.map(a => a.content);
-          const selectedAnswerId = selectedAnswers[qa.question.id];
-          const selectedIdx = selectedAnswerId
-            ? qa.answers.findIndex(a => a.id === selectedAnswerId)
-            : 0;
-
-          return {
-            question: qa.question.content,
-            answers: answerContents,
-            right_answer: selectedIdx >= 0 ? selectedIdx : 0,
-          };
-        }),
+        questions: questionsData.map(qa => ({
+          question_id: qa.question.id,
+          answer_id: selectedAnswers[qa.question.id] || 0,
+        })),
       };
 
       const res = await fetchWithAuth('/api/score', {
