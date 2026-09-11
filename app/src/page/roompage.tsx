@@ -168,6 +168,7 @@ export const RoomPage: React.FC<RoomPageProps> = ({ onRoomJoined }) => {
           exam_name: customExamName.trim(),
           domain: customDomain.trim(),
           questions: customQuestions,
+          duration: durationMinutes, // duration in minutes
         };
         const examRes = await createExam(payload);
         examIdToUse = examRes.exam_id;

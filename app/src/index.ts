@@ -16,6 +16,14 @@ export interface CreateExamPayload {
   exam_name: string;
   domain: string;
   questions: QuestionPayload[];
+  duration: number; // duration in minutes
+}
+
+export interface CreateExamByImagePayload {
+  exam_name: string;
+  domain: string;
+  duration: number;
+  answers: number[];
 }
 
 // Matches the backend Question struct
