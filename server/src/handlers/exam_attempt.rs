@@ -66,7 +66,7 @@ pub async fn create_exam_attempt(
 
     Ok(Json(CreateExamAttemptResponse {
         exam_attempt_id: exam_attempt_inserted.id,
-        exam_content
+        exam_content,
     }))
 }
 
@@ -266,65 +266,66 @@ pub async fn create_exam_attempt_by_room(
             )
         })?;
 
-    // member_attempt_opt == None -> no row found => not a member
-    if member_attempt_opt.is_none() {
-        return Err((
-            StatusCode::FORBIDDEN,
-            format!("User {} is not a member of room {}", user.id, req.room_id),
-        ));
-    }
+    match member_attempt_opt {
+        //Dữ liệu Không tồn tại
+        None => {
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!("User {} is not a member of room {}", user.id, req.room_id),
+            ));
+        }
+        Some(Some(existing_id)) => {
+            //already has an exam_attempt
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!(
+                    "Exam attempt already exists for this member: {}",
+                    existing_id
+                ),
+            ));
+        }
+        Some(None) => {
+            // create attempt using room.duration
+            let time_start = Utc::now().naive_utc();
+            let time_end = time_start + chrono::Duration::minutes(room_row.duration as i64);
 
-    // member_attempt_opt == Some(Some(id)) -> already has an exam_attempt
-    if let Some(Some(existing_id)) = member_attempt_opt {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            format!(
-                "Exam attempt already exists for this member: {}",
-                existing_id
-            ),
-        ));
-    }
+            let exam_attempt_inserted =
+                new_exam_attempt(room_row.exam_id, user.id, time_start, time_end, &mut conn)
+                    .map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            format!("Error during create exam attempt: {}", e),
+                        )
+                    })?;
 
-    // create attempt using room.duration
-    let time_start = Utc::now().naive_utc();
-    let time_end = time_start + chrono::Duration::minutes(room_row.duration as i64);
-
-    let exam_attempt_inserted =
-        new_exam_attempt(room_row.exam_id, user.id, time_start, time_end, &mut conn).map_err(
-            |e| {
+            // update room_member with exam_attempt_id
+            diesel::update(
+                room_member::table
+                    .filter(room_member::room_id.eq(req.room_id))
+                    .filter(room_member::user_id.eq(user.id)),
+            )
+            .set(room_member::exam_attempt_id.eq(Some(exam_attempt_inserted.id)))
+            .execute(&mut conn)
+            .map_err(|e| {
                 (
                     StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Error during create exam attempt: {}", e),
+                    format!("Failed to update room_member: {}", e),
                 )
-            },
-        )?;
+            })?;
 
-    // update room_member with exam_attempt_id
-    diesel::update(
-        room_member::table
-            .filter(room_member::room_id.eq(req.room_id))
-            .filter(room_member::user_id.eq(user.id)),
-    )
-    .set(room_member::exam_attempt_id.eq(Some(exam_attempt_inserted.id)))
-    .execute(&mut conn)
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Failed to update room_member: {}", e),
-        )
-    })?;
+            let exam_content = exam::get_exam_content_by_id(room_row.exam_id, &mut conn)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Error during create exam attempt: {}", e),
+                    )
+                })?;
 
-    let exam_content = exam::get_exam_content_by_id(room_row.exam_id, &mut conn)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("Error during create exam attempt: {}", e),
-            )
-        })?;
-
-    Ok(Json(CreateExamAttemptResponse {
-        exam_attempt_id: exam_attempt_inserted.id,
-        exam_content
-    }))
+            Ok(Json(CreateExamAttemptResponse {
+                exam_attempt_id: exam_attempt_inserted.id,
+                exam_content,
+            }))
+        }
+    }
 }

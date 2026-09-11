@@ -1,0 +1,7 @@
+python score.py \
+  --question "Định tuyến nằm ở phần mấy của tài liệu?" \
+  --A "I" \
+  --B "II" \
+  --C "III" \
+  --D "IV" \
+  --docs knowledge_docs/CCNALabGuide_tech24_vn.pdf

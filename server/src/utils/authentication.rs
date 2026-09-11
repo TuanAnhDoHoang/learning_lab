@@ -144,32 +144,60 @@ pub async fn authorization_middleware(
         )
     })?;
 
-    let auth_header = req.headers_mut().get(http::header::AUTHORIZATION);
-    let auth_header = match auth_header {
-        Some(header) => header.to_str().map_err(|_| {
+    // Try access_token from query string (useful for WebSocket handshakes),
+    // then Authorization header, then cookie.
+    let token = if let Some(q) = req.uri().query() {
+        // parse query like "a=1&access_token=..."
+        q.split('&')
+            .find_map(|kv| {
+                let mut parts = kv.splitn(2, '=');
+                let k = parts.next()?;
+                let v = parts.next()?;
+                if k == "access_token" { Some(v.to_string()) } else { None }
+            })
+    } else {
+        None
+    };
+
+    let token = if let Some(t) = token {
+        t
+    } else if let Some(header_val) = req.headers().get(http::header::AUTHORIZATION) {
+        let auth_header = header_val.to_str().map_err(|_| {
             (
                 StatusCode::FORBIDDEN,
                 "Empty header is not allowed".to_string(),
             )
-        })?,
-        None => {
-            return Err((
-                StatusCode::FORBIDDEN,
-                "Please add the JWT token to the header".to_string(),
-            ))
+        })?;
+        let mut parts = auth_header.split_whitespace();
+        let bearer = parts.next().ok_or((StatusCode::FORBIDDEN, "Missing token".to_string()))?;
+        if bearer != "Bearer" {
+            return Err((StatusCode::FORBIDDEN, "Missing Bearer".to_string()));
         }
+        parts.next().ok_or((StatusCode::FORBIDDEN, "Missing token".to_string()))?.to_string()
+    } else if let Some(cookie_val) = req.headers().get(http::header::COOKIE) {
+        // cookie header format: "k1=v1; k2=v2"
+        let s = cookie_val.to_str().map_err(|_| (StatusCode::FORBIDDEN, "Invalid cookie header".to_string()))?;
+        let token_opt = s
+            .split(';')
+            .map(|kv| kv.trim())
+            .find_map(|kv| {
+                let mut parts = kv.splitn(2, '=');
+                let k = parts.next()?;
+                let v = parts.next()?;
+                if k == "access_token" { Some(v.to_string()) } else { None }
+            });
+        match token_opt {
+            Some(t) => t,
+            None => return Err((StatusCode::FORBIDDEN, "Please add the JWT token to the header or cookie".to_string())),
+        }
+    } else {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Please add the JWT token to the header".to_string(),
+        ));
     };
-    let mut header = auth_header.split_whitespace();
-    let (bearer, token) = (header.next(), header.next());
 
-    let bearer = bearer.ok_or((StatusCode::FORBIDDEN, "Missing token".to_string()))?;
-    if bearer != "Bearer" {
-        return Err((StatusCode::FORBIDDEN, "Missing Bearer".to_string()));
-    }
-
-    let token = token.ok_or((StatusCode::FORBIDDEN, "Missing token".to_string()))?;
-
-    let token_data = match token::verify_token(token, "access") {
+    let token_data = match token::verify_token(&token, "access") {
         Ok(data) => data,
         Err(_) => {
             return Err((

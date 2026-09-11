@@ -22,18 +22,18 @@ use crate::{
     },
 };
 
-async fn handle_invalid_answer_count(
-    payload_answers_len: usize,
-    question_count: usize,
-) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
-    Err((
-        StatusCode::BAD_REQUEST,
-        format!(
-            "Số lượng câu trả lời đúng ({}) không khớp với số lượng câu hỏi ({}).",
-            payload_answers_len, question_count
-        ),
-    ))
-}
+// async fn handle_invalid_answer_count(
+//     payload_answers_len: usize,
+//     question_count: usize,
+// ) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
+//     Err((
+//         StatusCode::BAD_REQUEST,
+//         format!(
+//             "Số lượng câu trả lời đúng ({}) không khớp với số lượng câu hỏi ({}).",
+//             payload_answers_len, question_count
+//         ),
+//     ))
+// }
 
 pub async fn create_new_exam(
     State(app_state): State<AppState>,

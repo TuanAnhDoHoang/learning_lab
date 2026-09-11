@@ -19,7 +19,7 @@ use crate::{
         exam::{create_new_exam, get_exams, create_new_exam_by_image},
         exam_attempt::{attempt_score, create_exam_attempt, get_attempt, get_time_attempt_end, create_exam_attempt_by_room},
         question::get_question,
-        room::{close_room, create_room, delete_room, start_room},
+        room::{close_room, create_room, delete_room, room_live_answers, start_room},
         room_member::{get_room_by_userid, join_room, leave_room},
         score::handle_score,
         token::refresh,
@@ -94,6 +94,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/join_room", post(join_room))
         .route("/leave_room", post(leave_room))
         .route("/room_by_user", get(get_room_by_userid))
+        .route("/room_live_answers", get(crate::handlers::room::room_live_answers))
         .layer(middleware::from_fn_with_state(
             app_state.clone(),
             authorization_middleware,

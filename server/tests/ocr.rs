@@ -1,86 +1,100 @@
-use anyhow::{Context, anyhow};
+use anyhow::{anyhow, Context};
 use regex::Regex;
 
-
 #[tokio::test]
-async fn test_ocr(){
-	// This test ports the functionality of OCRT.py to Rust:
-	// - Reads an image file, base64-encodes it
-	// - Sends a request to the Google Gemini "generateContent" endpoint
-	// - Prints the extracted text from the response
+async fn test_ocr() {
+    // This test ports the functionality of OCRT.py to Rust:
+    // - Reads an image file, base64-encodes it
+    // - Sends a request to the Google Gemini "generateContent" endpoint
+    // - Prints the extracted text from the response
 
-	use reqwest::Client;
-	use serde_json::json;
-	use std::fs;
-	use std::env;
+    use reqwest::Client;
+    use serde_json::json;
+    use std::env;
+    use std::fs;
 
-	// Prompt copied from OCRT.py: ask Gemini to return only the plain text of the exam
-	const PROMPT: &str = r#"Hãy trích xuất chính xác toàn bộ nội dung đề thi trong ảnh này thành văn bản thuần (plain text).
+    // Prompt copied from OCRT.py: ask Gemini to return only the plain text of the exam
+    // 	const PROMPT: &str = r#"Hãy trích xuất chính xác toàn bộ nội dung đề thi trong ảnh này thành văn bản thuần (plain text).
 
+    // Yêu cầu:
+    // - Giữ nguyên số thứ tự câu hỏi và các phương án A/B/C/D.
+    // - KHÔNG đánh dấu hay ghi chú đáp án nào đã được khoanh/tô trong ảnh (chỉ lấy nội dung câu hỏi và các phương án, bỏ qua việc khoanh tay).
+    // - KHÔNG bao gồm thông tin cá nhân như họ tên thí sinh, số báo danh, mã đề (nếu có), các thông tin khác câu hỏi và đáp án
+    // - Giữ đúng chính tả và dấu tiếng Việt.
+    // - Không thêm bất kỳ bình luận, giải thích, hay ký hiệu markdown nào khác ngoài nội dung đề thi.
+    // "#;
+    const PROMPT: &str = r#"Hãy trích xuất chính xác toàn bộ nội dung đề thi trong ảnh này thành văn bản thuần (plain text).
 Yêu cầu:
+- Định dạng mỗi câu hỏi theo đúng mẫu sau:
+  Câu 1. [nội dung câu hỏi]
+  A. [phương án A]
+  B. [phương án B]
+  C. [phương án C]
+  D. [phương án D]
+- Nếu đề thi bằng tiếng Anh thì dùng "Question" thay cho "Câu" (ví dụ: Question 1. ...).
 - Giữ nguyên số thứ tự câu hỏi và các phương án A/B/C/D.
 - KHÔNG đánh dấu hay ghi chú đáp án nào đã được khoanh/tô trong ảnh (chỉ lấy nội dung câu hỏi và các phương án, bỏ qua việc khoanh tay).
-- KHÔNG bao gồm thông tin cá nhân như họ tên thí sinh, số báo danh, mã đề (nếu có), các thông tin khác câu hỏi và đáp án 
+- KHÔNG bao gồm thông tin cá nhân như họ tên thí sinh, số báo danh, mã đề (nếu có), các thông tin khác câu hỏi và đáp án.
 - Giữ đúng chính tả và dấu tiếng Việt.
 - Không thêm bất kỳ bình luận, giải thích, hay ký hiệu markdown nào khác ngoài nội dung đề thi.
 "#;
 
-	// Allow overriding via env var (recommended): GEMINI_API_KEY
-	let api_key = env::var("GEMINI_API_KEY").unwrap();
-	let model = "gemini-3.6-flash";
-	let api_url = format!(
-		"https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
-		model
-	);
+    // Allow overriding via env var (recommended): GEMINI_API_KEY
+    let api_key = "<API KEY>";
+    let model = "gemini-3.6-flash";
+    let api_url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+        model
+    );
 
-	// Image path used in the original run; change if needed.
-	let image_path = "History_Exam.jpg";
+    // Image path used in the original run; change if needed.
+    let image_path = "EnExam.jpg";
 
-	let data = fs::read(image_path).expect("failed to read image file");
-	let image_b64 = base64::encode(&data);
-	let mime_type = "image/jpeg"; // adjust if you use PNG etc.
+    let data = fs::read(image_path).expect("failed to read image file");
+    let image_b64 = base64::encode(&data);
+    let mime_type = "image/jpeg"; // adjust if you use PNG etc.
 
-	let payload = json!({
-		"contents": [
-			{
-				"parts": [
-					{ "text": PROMPT },
-					{ "inline_data": { "mime_type": mime_type, "data": image_b64 } }
-				]
-			}
-		]
-	});
+    let payload = json!({
+        "contents": [
+            {
+                "parts": [
+                    { "text": PROMPT },
+                    { "inline_data": { "mime_type": mime_type, "data": image_b64 } }
+                ]
+            }
+        ]
+    });
 
-	let client = Client::new();
-	let resp = client
-		.post(&api_url)
-		.header("Content-Type", "application/json")
-		.header("x-goog-api-key", api_key)
-		.json(&payload)
-		.send()
-		.await
-		.expect("request failed");
+    let client = Client::new();
+    let resp = client
+        .post(&api_url)
+        .header("Content-Type", "application/json")
+        .header("x-goog-api-key", api_key)
+        .json(&payload)
+        .send()
+        .await
+        .expect("request failed");
 
-	let status = resp.status();
-	let text = resp.text().await.expect("failed to read response text");
-	if !status.is_success() {
-		eprintln!("Gemini API returned error (status: {}):\n{}", status, text);
-		panic!("API error");
-	}
+    let status = resp.status();
+    let text = resp.text().await.expect("failed to read response text");
+    if !status.is_success() {
+        eprintln!("Gemini API returned error (status: {}):\n{}", status, text);
+        panic!("API error");
+    }
 
-	// Try to extract the candidate text similar to OCRT.py
-	let v: serde_json::Value = serde_json::from_str(&text).expect("invalid JSON response");
-	let extracted = v
-		.get("candidates")
-		.and_then(|c| c.get(0))
-		.and_then(|c0| c0.get("content"))
-		.and_then(|content| content.get("parts"))
-		.and_then(|parts| parts.get(0))
-		.and_then(|p0| p0.get("text"))
-		.and_then(|t| t.as_str())
-		.unwrap_or("(no text found)");
+    // Try to extract the candidate text similar to OCRT.py
+    let v: serde_json::Value = serde_json::from_str(&text).expect("invalid JSON response");
+    let extracted = v
+        .get("candidates")
+        .and_then(|c| c.get(0))
+        .and_then(|c0| c0.get("content"))
+        .and_then(|content| content.get("parts"))
+        .and_then(|parts| parts.get(0))
+        .and_then(|p0| p0.get("text"))
+        .and_then(|t| t.as_str())
+        .unwrap_or("(no text found)");
 
-	// println!("Extracted OCR text:\n{}", extracted);
+    println!("Extracted OCR text:\n{}", extracted);
 }
 
 #[derive(Debug)]
@@ -89,50 +103,50 @@ struct QuestionAnwers {
     answers: Vec<String>,
 }
 
-fn result_analyzer(extracted: &str) -> anyhow::Result<Vec<QuestionAnwers>>{ 
+fn result_analyzer(extracted: &str) -> anyhow::Result<Vec<QuestionAnwers>> {
     let mut result = Vec::new();
     // Regex crate của Rust KHÔNG hỗ trợ lookahead (khác Python), nên thay vì
     // split bằng lookahead, ta tìm VỊ TRÍ (offset) của từng mốc "Câu N."
     // rồi tự cắt chuỗi (slice) giữa các mốc đó.
     let question_marker = Regex::new(r"Câu\s+\d+\.")?;
- 
+
     // (?m) bật chế độ multi-line để ^ khớp đầu MỖI DÒNG, không chỉ đầu chuỗi.
     // Nhờ vậy "(1930)" hay "8 (1941)" nằm giữa dòng không bị nhầm là đáp án,
     // vì A-D ở đây bắt buộc phải đứng ở đầu dòng thì mới khớp.
     let answer_marker = Regex::new(r"(?m)^([A-D])\.\s*")?;
- 
+
     let starts: Vec<usize> = question_marker
         .find_iter(extracted)
         .map(|m| m.start())
         .collect();
- 
+
     if starts.is_empty() {
         return Err(anyhow!("Không tìm thấy câu hỏi nào trong văn bản đầu vào"));
     }
- 
+
     for (i, &start) in starts.iter().enumerate() {
         // Mỗi block là đoạn văn bản từ mốc "Câu N." hiện tại đến ngay trước
         // mốc "Câu N." kế tiếp (hoặc đến hết chuỗi nếu là câu cuối cùng)
         let end = starts.get(i + 1).copied().unwrap_or(extracted.len());
         let block = &extracted[start..end];
- 
+
         // Tìm vị trí tất cả đáp án A/B/C/D trong block này
         let answer_positions: Vec<(usize, usize)> = answer_marker
             .find_iter(block)
             .map(|m| (m.start(), m.end()))
             .collect();
- 
+
         if answer_positions.is_empty() {
             // Block không có đáp án nào đi kèm -> có thể là phần header/rác, bỏ qua
             continue;
         }
- 
+
         // Nội dung câu hỏi: từ ngay sau "Câu N." đến trước đáp án đầu tiên
         let q_marker_end = question_marker.find(block).map(|m| m.end()).unwrap_or(0);
         let question = block[q_marker_end..answer_positions[0].0]
             .trim()
             .replace('\n', " ");
- 
+
         // Tách nội dung từng đáp án: từ sau nhãn "A."/"B."/... đến trước nhãn kế tiếp
         let mut answers = Vec::new();
         for (idx, &(_, a_end)) in answer_positions.iter().enumerate() {
@@ -143,16 +157,15 @@ fn result_analyzer(extracted: &str) -> anyhow::Result<Vec<QuestionAnwers>>{
             let answer_text = block[a_end..content_end].trim().replace('\n', " ");
             answers.push(answer_text);
         }
- 
+
         result.push(QuestionAnwers { question, answers });
     }
 
     Ok(result)
 }
 
-
 #[tokio::test]
-async fn test_analyzer() -> anyhow::Result<()>{
+async fn test_analyzer() -> anyhow::Result<()> {
     let extracted = r"
  Câu 1. Thắng lợi của cuộc Tiến công chiến lược năm 1972 của quân và dân Việt Nam có ý nghĩa nào sau đây?
 A. Buộc Mỹ phải xuống thang chiến tranh, lập tức rút hết quân về nước.
@@ -196,8 +209,13 @@ C. chấm dứt ngay mọi xung đột giữa các nước.
 D. đối đầu giữa Liên Xô và Mỹ.   
     ";
     let result = result_analyzer(extracted).context("Error during analyzing extracted text")?;
-    for r in result{
+    for r in result {
         println!("{:?}", r);
     }
     Ok(())
+}
+
+#[tokio::test]
+async fn full_ocr() -> anyhow::Result<()>{
+	Ok(())
 }

@@ -1,0 +1,10 @@
+FAQ Phòng IT - Công ty ABC
+
+Q: Quên mật khẩu email?
+A: Vào portal self-service hoặc liên hệ IT Support qua Slack #it-support.
+
+Q: Cấp quyền VPN?
+A: Gửi ticket trên hệ thống ServiceNow, phê duyệt bởi Manager.
+
+Q: Cài phần mềm mới?
+A: Chỉ được cài phần mềm trong whitelist. Liên hệ IT để yêu cầu.

@@ -1,0 +1,88 @@
+{
+  "request_id": "811db49e-fd57-4659-8e62-5e38b99daa2e",
+  "timestamp": "2026-09-10T14:49:17.580404+00:00",
+  "question": "Định tuyến nằm ở phần mấy của tài liệu?",
+  "options": {
+    "A": "I",
+    "B": "II",
+    "C": "III",
+    "D": "IV"
+  },
+  "retrieved_chunks": [
+    {
+      "id": "CCNALabGuide_tech24_vn.pdf::chunk_15",
+      "source": "CCNALabGuide_tech24_vn.pdf",
+      "page": 22,
+      "similarity": 0.7183044190188439,
+      "content_preview": "ế độ c ấu hình c ủa interface s0/0/0 Boston(config-if)# description Link to Buffalo Router Cấu hình l ời mô t ả cho interface s0/0/0 của router. Boston(config)# ip address 172.16.20.1 255.255.255.252 "
+    },
+    {
+      "id": "CCNALabGuide_tech24_vn.pdf::chunk_0",
+      "source": "CCNALabGuide_tech24_vn.pdf",
+      "page": 1,
+      "similarity": 0.695723345052008,
+      "content_preview": "[Trang 1] CCNA LAB GUIDE Version 4.0 (Cisco Certified Network Associate) Tác giả: Dương Văn Toán Hà Nội - 12/10/2008 [Trang 2] Created by: Dương Văn Toán – CCNP, CCSP, MCSE, LPI level 1. http://www.vn"
+    },
+    {
+      "id": "CCNALabGuide_tech24_vn.pdf::chunk_16",
+      "source": "CCNALabGuide_tech24_vn.pdf",
+      "page": 24,
+      "similarity": 0.6932351515215821,
+      "content_preview": "« C ấu hình Defautl Router trên Router«. Router(config)# ip route 172.16.20.0 255.255.255.0 172.16.10.2 Trong đó : 172.16.20.0 = mạng đích. 255.255.255.0 = subnet mask của mạng đích. Các bạn có thể hi"
+    },
+    {
+      "id": "CCNALabGuide_tech24_vn.pdf::chunk_20",
+      "source": "CCNALabGuide_tech24_vn.pdf",
+      "page": 29,
+      "similarity": 0.6920032792228601,
+      "content_preview": "CCSP, MCSE, LPI level 1. http://www.vnexperts.net 28 1. Câu lệnh ip classless Router(config)# ip classess Router khi nhận được gói dữ liệu mà đích của gói dữ liệu không có trong bảng định tuyến thì gó"
+    },
+    {
+      "id": "CCNALabGuide_tech24_vn.pdf::chunk_17",
+      "source": "CCNALabGuide_tech24_vn.pdf",
+      "page": 25,
+      "similarity": 0.6870789623413405,
+      "content_preview": "gian và khả năng sử lý của router. - Khi static route được thêm vào hoặc bị xóa đi, thì route đó sẽ được router xử lý ngay ở giây đầu tiên. Trước phiên bản Cisco IOS 12.0, thì thời gian xử lý là vào g"
+    }
+  ],
+  "web_search_used": false,
+  "web_sources": [],
+  "model_outputs": [
+    {
+      "correct_option": "C",
+      "confidence": 1,
+      "evidence_quote": "Phần III: ĐỊNH TUYẾN",
+      "evidence_source": "CCNALabGuide_tech24_vn.pdf, trang 22",
+      "reasoning": "Theo ngữ cảnh tài liệu tại trang 22, nội dung Định tuyến thuộc Phần III (Phần III: ĐỊNH TUYẾN). Vì vậy đáp án đúng là C.",
+      "insufficient_evidence": false
+    }
+  ],
+  "guardrail_results": {
+    "schema_ok": true,
+    "citation_ok": true,
+    "consistency_ok": true,
+    "verifier_ok": false,
+    "confidence_ok": true,
+    "details": {
+      "schema_run_0": {
+        "ok": true,
+        "error": ""
+      },
+      "consistency": {
+        "options": [
+          "C"
+        ],
+        "majority": "C",
+        "ratio": 1.0
+      },
+      "citation": {
+        "score": 1.0,
+        "quote": "Phần III: ĐỊNH TUYẾN"
+      },
+      "verifier_error": "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash\\nPlease retry in 46.967527061s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-3.6-flash', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '46s'}]}}"
+    }
+  },
+  "final_status": "needs_human_review",
+  "final_result": null,
+  "reason": "verifier không đồng thuận"
+}

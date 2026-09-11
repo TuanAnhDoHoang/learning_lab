@@ -1,0 +1,80 @@
+{
+  "request_id": "fd0bfa33-3693-4ca7-911c-a9843f578de6",
+  "timestamp": "2026-09-10T14:30:08.591509+00:00",
+  "question": "Nhân viên chính thức được hưởng 12 ngày phép trong năm, so với thực tế ở Việt Nam thì như thế nào?",
+  "options": {
+    "A": "Ít hơn",
+    "B": "Nhiều Hơn",
+    "C": "Bằng nhau",
+    "D": "Ở tùy lĩnh vực"
+  },
+  "retrieved_chunks": [
+    {
+      "id": "chinh_sach_nghi_phep.txt::chunk_0",
+      "source": "chinh_sach_nghi_phep.txt",
+      "page": null,
+      "similarity": 0.7553509050014513,
+      "content_preview": "Chính sách nghỉ phép công ty ABC (cập nhật 2026) 1. Nhân viên chính thức được hưởng 12 ngày phép năm. 2. Phép năm được tính theo năm dương lịch (1/1 - 31/12). 3. Nghỉ phép phải đăng ký trước ít nhất 3"
+    }
+  ],
+  "web_search_used": false,
+  "web_sources": [],
+  "model_outputs": [
+    {
+      "correct_option": "A",
+      "confidence": 0,
+      "evidence_quote": "",
+      "evidence_source": "chinh_sach_nghi_phep.txt",
+      "reasoning": "Ngữ cảnh được cung cấp không chứa thông tin so sánh số ngày phép của công ty ABC với thực tế ở Việt Nam.",
+      "insufficient_evidence": true
+    },
+    {
+      "correct_option": "A",
+      "confidence": 0,
+      "evidence_quote": "",
+      "evidence_source": "chinh_sach_nghi_phep.txt",
+      "reasoning": "Ngữ cảnh được cung cấp không chứa thông tin so sánh 12 ngày phép của công ty ABC với thực tế ở Việt Nam. Do đó không đủ cơ sở để chọn đáp án.",
+      "insufficient_evidence": true
+    }
+  ],
+  "guardrail_results": {
+    "schema_ok": true,
+    "citation_ok": false,
+    "consistency_ok": true,
+    "verifier_ok": false,
+    "confidence_ok": false,
+    "details": {
+      "schema_run_0": {
+        "ok": true,
+        "error": ""
+      },
+      "schema_run_1": {
+        "ok": true,
+        "error": ""
+      },
+      "consistency": {
+        "options": [
+          "A",
+          "A"
+        ],
+        "majority": "A",
+        "ratio": 1.0
+      },
+      "citation": {
+        "score": 0.0,
+        "quote": ""
+      },
+      "verifier": {
+        "is_valid": false,
+        "confidence": 1.0,
+        "issues": [
+          "Ngữ cảnh không cung cấp thông tin so sánh với thực tế ở Việt Nam. Giám khảo nhận định đúng là thiếu dữ kiện (insufficient_evidence: true) nhưng vẫn chọn đáp án A là không hợp lý."
+        ],
+        "agreed_option": "null"
+      }
+    }
+  },
+  "final_status": "needs_human_review",
+  "final_result": null,
+  "reason": "citation không khớp / verifier không đồng thuận / confidence thấp (0.00) hoặc insufficient_evidence"
+}

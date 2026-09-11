@@ -540,7 +540,8 @@ Test này kiểm tra luồng nghiệp vụ thực tế của hệ thống từ l
 #### 📤 Response Mẫu:
 ```json
 {
-  "room_id": 3
+  "room_id": 3,
+  "room_code": "ROOM-1-123456"
 }
 ```
 
@@ -654,18 +655,27 @@ Test này kiểm tra luồng nghiệp vụ thực tế của hệ thống từ l
 
 #### 📤 Response Mẫu:
 ```json
-[
-  {
-    "user_id": 2,
-    "score": 2,
-    "total": 2
-  },
-  {
-    "user_id": 5,
-    "score": 1,
-    "total": 2
-  }
-]
+{
+  "room_id": 3,
+  "members": [
+    {
+      "user_id": 2,
+      "score": {
+        "score": 2,
+        "sum_of_question": 2,
+        "question_no_answer": []
+      }
+    },
+    {
+      "user_id": 5,
+      "score": {
+        "score": 1,
+        "sum_of_question": 2,
+        "question_no_answer": []
+      }
+    }
+  ]
+}
 ```
 
 #### 15.7. Lấy điểm chi tiết của một user trong phòng
@@ -685,8 +695,11 @@ Test này kiểm tra luồng nghiệp vụ thực tế của hệ thống từ l
 ```json
 {
   "user_id": 2,
-  "score": 2,
-  "total": 2
+  "score": {
+    "score": 2,
+    "sum_of_question": 2,
+    "question_no_answer": []
+  }
 }
 ```
 
@@ -706,8 +719,11 @@ Test này kiểm tra luồng nghiệp vụ thực tế của hệ thống từ l
 ```json
 {
   "user_id": 2,
-  "score": 2,
-  "total": 2
+  "score": {
+    "score": 2,
+    "sum_of_question": 2,
+    "question_no_answer": []
+  }
 }
 ```
 

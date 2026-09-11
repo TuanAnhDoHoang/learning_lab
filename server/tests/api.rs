@@ -158,6 +158,49 @@ async fn all_routes_true_logic_test() {
 }
 
 #[tokio::test]
+async fn start_exam_attempt_by_room_reuses_existing_attempt() {
+    let _server = TestServer::start().await;
+    let client = Client::new();
+
+    let admin_login =
+        auth::login_user(&client, helpers::ADMIN_EMAIL, helpers::ADMIN_PASSWORD).await;
+    let admin_token = admin_login["access_token"].as_str().unwrap().to_string();
+
+    let user_email = format!("reuse_attempt_user_{}@gmail.com", chrono::Utc::now().timestamp_millis());
+    let _ = register_user(&client, &user_email, "reuseattempt", "Pass#1234").await;
+    let login = auth::login_user(&client, &user_email, "Pass#1234").await;
+    let token = login["access_token"].as_str().unwrap().to_string();
+
+    let exam = exam::create_exam(
+        &client,
+        &admin_token,
+        "Reuse attempt exam",
+        "Lập trình Backend",
+    )
+    .await;
+    let exam_id = exam["exam_id"].as_i64().unwrap() as i32;
+
+    let room = room::create_room(&client, &admin_token, "Reuse attempt room", exam_id, 20).await;
+    let room_id = room["room_id"].as_i64().unwrap() as i32;
+    let room_code = room["room_code"].as_str().unwrap().to_string();
+
+    let _ = room::join_room(&client, &token, &room_code).await;
+    let _ = room::start_room(&client, &admin_token, room_id).await;
+
+    let first = room::start_exam_attempt_by_room(&client, &token, room_id).await;
+    let second = room::start_exam_attempt_by_room(&client, &token, room_id).await;
+
+    let first_attempt: StartExamAttemptResponse = serde_json::from_value(first).unwrap();
+    let second_attempt: StartExamAttemptResponse = serde_json::from_value(second).unwrap();
+
+    assert_eq!(first_attempt.exam_attempt_id, second_attempt.exam_attempt_id);
+    assert_eq!(first_attempt.exam_content.exam_id, exam_id);
+    assert_eq!(second_attempt.exam_content.exam_id, exam_id);
+
+    let _ = room::delete_room(&client, &admin_token, room_id).await;
+}
+
+#[tokio::test]
 async fn create_exam_accepts_partial_right_answers() {
     let _server = TestServer::start().await;
     let client = Client::new();

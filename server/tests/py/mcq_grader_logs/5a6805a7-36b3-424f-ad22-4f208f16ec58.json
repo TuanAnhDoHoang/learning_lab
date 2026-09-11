@@ -1,0 +1,86 @@
+{
+  "request_id": "5a6805a7-36b3-424f-ad22-4f208f16ec58",
+  "timestamp": "2026-09-10T13:24:24.858875+00:00",
+  "question": "Nhân viên chính thức được hưởng bao nhiêu ngày phép năm?",
+  "options": {
+    "A": "12",
+    "B": "13",
+    "C": "14",
+    "D": "15"
+  },
+  "retrieved_chunks": [
+    {
+      "id": "chinh_sach_nghi_phep.txt::chunk_0",
+      "source": "chinh_sach_nghi_phep.txt",
+      "page": null,
+      "similarity": 0.7689839447310992,
+      "content_preview": "Chính sách nghỉ phép công ty ABC (cập nhật 2026) 1. Nhân viên chính thức được hưởng 12 ngày phép năm. 2. Phép năm được tính theo năm dương lịch (1/1 - 31/12). 3. Nghỉ phép phải đăng ký trước ít nhất 3"
+    }
+  ],
+  "web_search_used": false,
+  "web_sources": [],
+  "model_outputs": [
+    {
+      "correct_option": "A",
+      "confidence": 1,
+      "evidence_quote": "Nhân viên chính thức được hưởng 12 ngày phép năm.",
+      "evidence_source": "chinh_sach_nghi_phep.txt",
+      "reasoning": "Mục 1 trong ngữ cảnh ghi rõ 'Nhân viên chính thức được hưởng 12 ngày phép năm.' tương ứng với đáp án A.",
+      "insufficient_evidence": false
+    },
+    {
+      "correct_option": "A",
+      "confidence": 1,
+      "evidence_quote": "1. Nhân viên chính thức được hưởng 12 ngày phép năm.",
+      "evidence_source": "chinh_sach_nghi_phep.txt",
+      "reasoning": "Theo mục 1 của chính sách nghỉ phép, nhân viên chính thức được hưởng 12 ngày phép năm.",
+      "insufficient_evidence": false
+    }
+  ],
+  "guardrail_results": {
+    "schema_ok": true,
+    "citation_ok": true,
+    "consistency_ok": true,
+    "verifier_ok": true,
+    "confidence_ok": true,
+    "details": {
+      "schema_run_0": {
+        "ok": true,
+        "error": ""
+      },
+      "schema_run_1": {
+        "ok": true,
+        "error": ""
+      },
+      "consistency": {
+        "options": [
+          "A",
+          "A"
+        ],
+        "majority": "A",
+        "ratio": 1.0
+      },
+      "citation": {
+        "score": 1.0,
+        "quote": "Nhân viên chính thức được hưởng 12 ngày phép năm."
+      },
+      "verifier": {
+        "is_valid": true,
+        "confidence": 1.0,
+        "issues": [],
+        "agreed_option": "A"
+      }
+    }
+  },
+  "final_status": "auto_graded",
+  "final_result": {
+    "correct_option": "A",
+    "confidence": 1.0,
+    "evidence_quote": "Nhân viên chính thức được hưởng 12 ngày phép năm.",
+    "evidence_source": "chinh_sach_nghi_phep.txt",
+    "reasoning": "Mục 1 trong ngữ cảnh ghi rõ 'Nhân viên chính thức được hưởng 12 ngày phép năm.' tương ứng với đáp án A.",
+    "insufficient_evidence": false,
+    "status": "auto_graded"
+  },
+  "reason": ""
+}
