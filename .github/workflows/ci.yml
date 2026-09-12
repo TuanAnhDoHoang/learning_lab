@@ -22,6 +22,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Create env file
+        run: |
+          mkdir -p server
+          echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> server/.env
+          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> server/.env
+          echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> server/.env
+
       - name: Build all services
         run: docker compose build --no-cache
 
@@ -39,12 +46,6 @@ jobs:
         run: |
           docker compose config
           docker images
-
-      - name: Create env file
-        run: |
-          echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> server/.env
-          echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> server/.env
-          echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> server/.env
 
       - name: Stop services
         if: always()
