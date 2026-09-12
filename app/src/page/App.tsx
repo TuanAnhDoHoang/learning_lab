@@ -8,6 +8,8 @@ import { ExamCard } from '../components/ExamCard';
 import { Sidebar } from '../components/Sidebar';
 import { ExamModal } from '../components/ExamModal';
 import { ExamHistoryModal } from '../components/ExamHistoryModal';
+import { EditExamModal } from '../components/EditExamModal';
+import { DeleteExamModal } from '../components/DeleteExamModal';
 import { Footer } from '../components/Footer';
 import { ExamPage } from './ExamPage';
 import { LoginPage } from './LoginPage';
@@ -24,6 +26,13 @@ const DOMAIN_MAP: Record<number, string> = {
   1: 'Toán học',
   2: 'Vật lý',
   3: 'Hóa học',
+  4: 'Lịch sử',
+  5: 'Địa lý',
+  6: 'Sinh học',
+  7: 'Tin học',
+  8: 'Ngữ văn',
+  9: 'Tiếng Anh',
+  10: 'GDCD',
 };
 
 interface UserSession {
@@ -78,6 +87,14 @@ export const App: React.FC = () => {
   const [activeModalExam, setActiveModalExam] = useState<Exam | null>(null);
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
   const [settingsToast, setSettingsToast] = useState<string | null>(null);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  const [deletingExam, setDeletingExam] = useState<Exam | null>(null);
+  const [appToast, setAppToast] = useState<string | null>(null);
+
+  const showAppToast = (msg: string) => {
+    setAppToast(msg);
+    setTimeout(() => setAppToast(null), 3500);
+  };
 
   const handleOpenSettings = () => {
     setSettingsToast('Tính năng Cài đặt tài khoản đang được phát triển.');
@@ -231,7 +248,7 @@ export const App: React.FC = () => {
         roomId={takingExamSession.roomId}
         roomCode={takingExamSession.roomCode}
         onBack={() => setTakingExamSession(null)}
-        onSwitchToProctor={(remainingSeconds) => {
+        onSwitchToProctor={(remainingSeconds: number) => {
           if (takingExamSession.roomId && takingExamSession.isHost) {
             setTakingExamSession(prev => prev ? {
               ...prev,
@@ -281,7 +298,14 @@ export const App: React.FC = () => {
           onOpenSettings={handleOpenSettings}
         />
         <RoomPage
-          onRoomJoined={(roomId, roomCode, isHost, examId, durationMinutes, hostRole) => {
+          onRoomJoined={(
+            roomId: number,
+            roomCode: string,
+            isHost: boolean,
+            examId?: number,
+            durationMinutes?: number,
+            hostRole?: HostRoleMode
+          ) => {
             setLobbySession({ roomId, roomCode, isHost, examId, durationMinutes, hostRole });
             setCurrentView('lobby');
           }}
@@ -396,6 +420,7 @@ export const App: React.FC = () => {
   return (
     <div className="app-root">
       {settingsToast && <div className="exam-toast">{settingsToast}</div>}
+      {appToast && <div className="exam-toast">{appToast}</div>}
       <Navbar
         currentView={currentView}
         onNavigate={view => setCurrentView(view)}
@@ -441,7 +466,10 @@ export const App: React.FC = () => {
                   <ExamCard
                     key={exam.id}
                     exam={exam}
+                    currentUser={user}
                     onOpenDetail={setActiveModalExam}
+                    onEdit={setEditingExam}
+                    onDelete={setDeletingExam}
                   />
                 ))
               ) : (
@@ -459,8 +487,34 @@ export const App: React.FC = () => {
 
       <ExamModal
         exam={activeModalExam}
+        currentUser={user}
         onClose={() => setActiveModalExam(null)}
         onStartExam={handleStartExamFromModal}
+        onEdit={setEditingExam}
+        onDelete={setDeletingExam}
+      />
+
+      <EditExamModal
+        isOpen={Boolean(editingExam)}
+        exam={editingExam}
+        onClose={() => setEditingExam(null)}
+        onSuccess={(updated) => {
+          showAppToast(`Đã cập nhật đề thi "${updated.name}" thành công!`);
+          loadExams();
+        }}
+      />
+
+      <DeleteExamModal
+        isOpen={Boolean(deletingExam)}
+        exam={deletingExam}
+        onClose={() => setDeletingExam(null)}
+        onSuccess={() => {
+          showAppToast('Đã xóa đề thi thành công!');
+          if (activeModalExam && deletingExam && activeModalExam.id === deletingExam.id) {
+            setActiveModalExam(null);
+          }
+          loadExams();
+        }}
       />
 
       <ExamHistoryModal

@@ -470,6 +470,18 @@ export async function startExamAttempt(examId: number): Promise<StartExamAttempt
   return res.json();
 }
 
+// delete room before starting exam attempt (only owner can delete)
+export async function deleteRoom(roomId: number): Promise<void> {
+  const res = await fetchWithAuth(`${API_BASE}/delete_room`, {
+    method: 'POST',
+    body: JSON.stringify({ room_id: roomId }),
+  });
+  if (!res.ok) {
+    const errorMsg = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to delete room: ${errorMsg}`);
+  }
+}
+
 export async function fetchTimeAttemptEnd(examAttemptId: number): Promise<TimeAttemptEndResponse> {
   const res = await fetchWithAuth(`${API_BASE}/time_attempt_end`, {
     method: 'POST',
@@ -500,4 +512,38 @@ export async function scoreAttempt(examAttemptId: number): Promise<ScoreAttemptR
   return res.json();
 }
 
+// Xóa đề thi (chỉ chủ sở hữu đề thi mới có quyền xóa)
+export async function deleteExam(examId: number): Promise<{ exam_id: number }> {
+  const res = await fetchWithAuth(`${API_BASE}/delete_exam`, {
+    method: 'POST',
+    body: JSON.stringify({ exam_id: examId }),
+  });
+  if (!res.ok) {
+    const errorMsg = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to delete exam: ${errorMsg}`);
+  }
+  return res.json();
+}
+
+// Cập nhật thông tin đề thi (chỉ chủ sở hữu đề thi mới có quyền cập nhật)
+export async function updateExam(
+  examId: number,
+  payload: { exam_name?: string; name?: string; domain: string; duration: number }
+): Promise<{ exam_id: number }> {
+  const examName = payload.exam_name || payload.name || '';
+  const res = await fetchWithAuth(`${API_BASE}/update_exam`, {
+    method: 'POST',
+    body: JSON.stringify({
+      exam_id: examId,
+      exam_name: examName,
+      domain: payload.domain,
+      duration: payload.duration,
+    }),
+  });
+  if (!res.ok) {
+    const errorMsg = await res.text().catch(() => res.statusText);
+    throw new Error(`Failed to update exam: ${errorMsg}`);
+  }
+  return res.json();
+}
 

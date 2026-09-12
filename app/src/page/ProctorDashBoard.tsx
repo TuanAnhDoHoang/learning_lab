@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CandidateProgress, ProctorActivityEvent, CustomExamData, CandidateLiveState, RoomMemberScoreItem } from '..';
 import { fetchQuestions, closeRoom, fetchRoomScores } from '../api/apicaller';
+import { useRoomLiveSocket } from '../hook/useRoomLiveSocket';
 
 interface ProctorDashboardProps {
   roomId?: number;
@@ -42,6 +43,9 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
   const [finalScores, setFinalScores] = useState<RoomMemberScoreItem[] | null>(null);
   const [showScoreModal, setShowScoreModal] = useState<boolean>(false);
   const [totalQuestions, setTotalQuestions] = useState<number>(() => customExamData?.questions?.length || 0);
+
+  // Real-time WebSocket Monitoring Hook
+  const { snapshot, isConnected, isConnecting } = useRoomLiveSocket(roomId, !isExamFinished);
 
   // Fetch real questions for proctor from backend if examId is present
   useEffect(() => {
@@ -89,9 +93,7 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
 
   /* ── Initial Candidates State ── */
   const [candidates, setCandidates] = useState<CandidateProgress[]>(() => {
-    const list = participants.length > 0
-      ? participants.filter(p => p !== currentUser?.username && p !== 'Chủ phòng')
-      : ['Nguyễn Văn A', 'Trần Thị B', 'Lê Hoàng C', 'Phạm Minh D', 'Đỗ Quỳnh E'];
+    const list = participants.filter(p => p !== currentUser?.username && p !== 'Chủ phòng');
 
     return list.map((name, idx) => ({
       id: `cand-${idx + 1}`,
@@ -199,6 +201,57 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
         .catch(() => {});
     }
   }, [roomId, totalQuestions, currentUser]);
+
+  // Sync real-time snapshot from WebSocket to candidate progress
+  useEffect(() => {
+    if (!snapshot || !snapshot.members) return;
+
+    setCandidates(prevCandidates => {
+      // Map existing candidate IDs
+      const existingMap = new Map<number, CandidateProgress>();
+      prevCandidates.forEach(cand => {
+        const uid = parseInt(cand.id.replace('cand-', ''), 10);
+        if (!isNaN(uid)) existingMap.set(uid, cand);
+      });
+
+      // Build or update candidates from snapshot
+      const updated: CandidateProgress[] = snapshot.members.map(member => {
+        const existing = existingMap.get(member.user_id);
+        const isMe = member.user_id === currentUser?.userid;
+        const displayName = existing?.name || (isMe ? `${currentUser?.username || 'Bạn'} (Chủ phòng)` : `Học sinh ID: ${member.user_id}`);
+        const currentAnswered = member.answers.length;
+
+        // Log if candidate answered a new question
+        if (existing && currentAnswered > existing.answeredCount) {
+          const latestAns = member.answers[member.answers.length - 1];
+          addActivityLog(displayName, 'info', `Vừa hoàn thành câu hỏi số ${latestAns.question_id}`);
+        }
+
+        return {
+          id: `cand-${member.user_id}`,
+          name: displayName,
+          state: existing?.state || 'active',
+          answeredCount: currentAnswered,
+          totalQuestions: totalQuestions || 10,
+          violationsCount: existing?.violationsCount || 0,
+          violationsList: existing?.violationsList || [],
+          lastHeartbeat: 'Vừa xong',
+          timeSpentSeconds: existing?.timeSpentSeconds || 0,
+          score: existing?.score,
+          bonusMinutesAdded: existing?.bonusMinutesAdded || 0,
+        };
+      });
+
+      return updated;
+    });
+  }, [snapshot, totalQuestions, currentUser]);
+
+  // Log WebSocket connection event
+  useEffect(() => {
+    if (isConnected) {
+      addActivityLog('Hệ thống', 'info', 'Đã kết nối luồng giám sát trực tiếp (WebSocket).');
+    }
+  }, [isConnected]);
 
   /* ── Room Countdown Timer ── */
   useEffect(() => {
@@ -455,6 +508,43 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
               <span className="proctor-code-tag">Mã phòng: <strong>{roomCode}</strong></span>
               <span className="proctor-exam-tag">Đề: <strong>{examName}</strong></span>
               {enableAntiCheat && <span className="proctor-shield-tag">Giám sát Anti-Cheat: BẬT</span>}
+              {isConnected ? (
+                <span style={{
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  background: 'rgba(16, 185, 129, 0.15)',
+                  color: '#10b981',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                }}>
+                  WebSocket: Trực tiếp
+                </span>
+              ) : isConnecting ? (
+                <span style={{
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  background: 'rgba(245, 158, 11, 0.15)',
+                  color: '#f59e0b',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                }}>
+                  WebSocket: Đang kết nối lại...
+                </span>
+              ) : (
+                <span style={{
+                  padding: '3px 8px',
+                  borderRadius: '4px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  color: '#ef4444',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                }}>
+                  WebSocket: Đã ngắt
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -673,12 +763,14 @@ export const ProctorDashboard: React.FC<ProctorDashboardProps> = ({
           </aside>
         </div>
 
-        {/* Back to Home row */}
-        <div className="proctor-footer-row">
-          <button className="btn-room-back" onClick={onBackToHome}>
-            Quay về Trang chủ
-          </button>
-        </div>
+        {/* Back to Home row - chỉ hiển thị sau khi phòng thi đã kết thúc */}
+        {isExamFinished && (
+          <div className="proctor-footer-row">
+            <button className="btn-room-back" onClick={onBackToHome}>
+              Quay về Trang chủ
+            </button>
+          </div>
+        )}
       </main>
     </div>
   );

@@ -70,7 +70,6 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   /* ── Anti-Cheat State ── */
   const [violations, setViolations] = useState<ViolationRecord[]>([]);
   const [showWarningModal, setShowWarningModal] = useState(false);
-  const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -86,7 +85,14 @@ export const ExamPage: React.FC<ExamPageProps> = ({
   const isExamActiveRef = useRef<boolean>(true);
 
   const currentUsername = currentUser?.username || 'Bạn';
-  const progressStorageKey = `lab_exam_progress_${examId}_${examName.replace(/\s+/g, '_')}`;
+
+  // Khóa lưu trữ cục bộ được định danh duy nhất theo lượt thi (attemptId / roomId / user)
+  // Ngăn chặn hoàn toàn việc rò rỉ đáp án khi tham gia 2 phòng thi khác nhau chung 1 đề thi
+  const sessionScope = attemptId 
+    ? `attempt_${attemptId}` 
+    : (roomId ? `room_${roomId}` : `exam_${examId}`);
+  const userScope = currentUser?.username ? currentUser.username.replace(/[^a-zA-Z0-9_-]/g, '_') : 'guest';
+  const progressStorageKey = `lab_exam_progress_${userScope}_${sessionScope}`;
 
   // Helper to trigger toast
   const showToast = (msg: string) => {
@@ -122,6 +128,20 @@ export const ExamPage: React.FC<ExamPageProps> = ({
       const savedProgress = localStorage.getItem(progressStorageKey);
       if (savedProgress) {
         const parsed = JSON.parse(savedProgress);
+
+        // Kiểm tra TTL (Time-To-Live) thời hạn hiệu lực của dữ liệu lưu tạm
+        // Nếu thời điểm lưu đã vượt quá thời lượng bài thi (cộng 2 phút ân hạn), dữ liệu xem như đã hết hạn
+        const now = Date.now();
+        const savedAt = typeof parsed.savedAt === 'number' ? parsed.savedAt : 0;
+        const maxDurationMs = ((parsed.durationSeconds || (durationMinutes || 15) * 60) + 120) * 1000;
+        const isExpired = savedAt > 0 && (now - savedAt > maxDurationMs);
+
+        if (isExpired) {
+          console.info('Tiến trình làm bài cũ đã hết hạn, xóa bộ nhớ tạm:', progressStorageKey);
+          localStorage.removeItem(progressStorageKey);
+          return;
+        }
+
         if (parsed.selectedAnswers && Object.keys(parsed.selectedAnswers).length > 0) {
           setSelectedAnswers(parsed.selectedAnswers);
         }
@@ -138,7 +158,7 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     } catch (e) {
       console.warn('Could not restore saved exam progress:', e);
     }
-  }, [progressStorageKey]);
+  }, [progressStorageKey, durationMinutes]);
 
   /* ── Auto-Save Progress to LocalStorage on every answer or violation change ── */
   useEffect(() => {
@@ -146,18 +166,36 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     try {
       const stateToSave = {
         examId,
+        attemptId,
+        roomId,
         examName,
         selectedAnswers,
         currentIndex,
         violations,
         savedTimeLeft: timeLeft,
+        savedAt: Date.now(),
+        durationSeconds: (durationMinutes || 15) * 60,
         lastSavedAt: new Date().toISOString(),
       };
       localStorage.setItem(progressStorageKey, JSON.stringify(stateToSave));
     } catch (e) {
       console.warn('Could not auto-save exam progress:', e);
     }
-  }, [selectedAnswers, currentIndex, violations, timeLeft, submitted, loading, questionsData, progressStorageKey, examId, examName]);
+  }, [
+    selectedAnswers,
+    currentIndex,
+    violations,
+    timeLeft,
+    submitted,
+    loading,
+    questionsData,
+    progressStorageKey,
+    examId,
+    examName,
+    attemptId,
+    roomId,
+    durationMinutes,
+  ]);
 
   /* ── Fetch or initialize questions ── */
   useEffect(() => {
@@ -791,59 +829,48 @@ export const ExamPage: React.FC<ExamPageProps> = ({
         </div>
       )}
 
-      {/* ── Exit Confirmation Modal ── */}
-      {showExitConfirmModal && (
-        <div className="violation-modal-overlay">
-          <div className="violation-modal-card">
-            <h3>XÁC NHẬN RỜI BÀI THI</h3>
-            <p className="violation-desc">Bài thi đang diễn ra! Bạn có chắc chắn muốn rời khỏi không?</p>
-            <p className="violation-subtext">
-              Tiến trình làm bài của bạn đã được lưu tạm, tuy nhiên đồng hồ thời gian làm bài của phòng thi vẫn tiếp tục đếm ngược.
-            </p>
-            <div className="exit-modal-actions-row">
-              <button
-                className="btn-continue-exam"
-                style={{ background: 'var(--primary-color)' }}
-                onClick={() => setShowExitConfirmModal(false)}
-              >
-                Tiếp tục làm bài
-              </button>
-              <button
-                className="btn-danger-exit"
-                onClick={() => {
-                  setShowExitConfirmModal(false);
-                  isExamActiveRef.current = false;
-                  exitFullscreenMode();
-                  onBack();
-                }}
-              >
-                Xác nhận Thoát
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Top Header Bar ── */}
       <div className="exam-header-bar">
-        <button
-          className="exam-back-btn"
-          onClick={() => {
-            if (!submitted) {
-              setShowExitConfirmModal(true);
-            } else {
+        {isHost && roomId && onSwitchToProctor ? (
+          <button
+            className="exam-back-btn"
+            onClick={() => {
               isExamActiveRef.current = false;
               exitFullscreenMode();
-              if (isHost && roomId && onSwitchToProctor) {
-                onSwitchToProctor(timeLeft);
-              } else {
-                onBack();
-              }
-            }
-          }}
-        >
-          {isHost && roomId ? 'Giám sát phòng' : 'Thoát'}
-        </button>
+              onSwitchToProctor(timeLeft);
+            }}
+          >
+            Giám sát phòng
+          </button>
+        ) : submitted ? (
+          <button
+            className="exam-back-btn"
+            onClick={() => {
+              isExamActiveRef.current = false;
+              exitFullscreenMode();
+              onBack();
+            }}
+          >
+            {roomId ? 'Rời phòng' : 'Quay lại'}
+          </button>
+        ) : (
+          /* Khi bài thi đã bắt đầu (!submitted): Tuyệt đối KHÔNG có nút thoát khỏi phòng */
+          <div className="exam-header-room-badge" style={{ display: 'flex', alignItems: 'center' }}>
+            <span
+              style={{
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                color: 'var(--text-muted)',
+                background: 'var(--bg-surface)',
+                padding: '6px 14px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)',
+              }}
+            >
+              {roomId ? `Phòng thi #${roomId}` : 'Đang làm bài'}
+            </span>
+          </div>
+        )}
 
         <div className="exam-title-center">
           <h2 className="exam-title-bar">{examName}</h2>

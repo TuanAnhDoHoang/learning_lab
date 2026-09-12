@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { startRoom, startExamAttemptByRoom, fetchWithAuth, leaveRoom } from '../api/apicaller';
+import { startRoom, startExamAttemptByRoom, fetchWithAuth, leaveRoom, deleteRoom } from '../api/apicaller';
 import { ExamContent } from '../index';
 
 interface LobbyPageProps {
@@ -19,6 +19,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
   const [isStarting, setIsStarting] = useState(false);
   const [memberCount, setMemberCount] = useState<number>(0);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Poll member count for host (uses room_scores endpoint which returns member list)
   const fetchMemberCount = useCallback(async () => {
@@ -56,11 +57,21 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
         clearInterval(interval);
         onExamStarted(res.exam_attempt_id, res.exam_content, false);
       } catch (err: any) {
-        // Ignore 403 / "Room have not start yet" error, keep waiting
-        if (err.status !== 403) {
-           // Other errors might be terminal, but we just ignore and retry for now
-           console.error("Polling error:", err);
+        // 1. Phòng thi chưa bắt đầu (HTTP 403 "Room have not start yet"): Tiếp tục chờ bình thường
+        if (err.status === 403 || (err.message && err.message.toLowerCase().includes('not start yet'))) {
+          return;
         }
+
+        // 2. Phòng thi thực sự bị xóa / không tìm thấy: Báo lỗi và rời phòng
+        if (err.status === 404 || (err.message && err.message.toLowerCase().includes('not found'))) {
+          clearInterval(interval);
+          alert('Phòng thi đã bị chủ phòng hủy.');
+          onLeave();
+          return;
+        }
+
+        // Lỗi khác: Ghi log và tiếp tục thử lại
+        console.error("Polling error:", err);
       }
     }, 3000);
 
@@ -100,6 +111,19 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
   };
 
   const [isLeaving, setIsLeaving] = useState(false);
+
+  const handleDeleteRoom = async () => {
+    setShowDeleteConfirm(false);
+    setIsLeaving(true);
+    try {
+      await deleteRoom(roomId);
+    } catch (err: any) {
+      console.warn('deleteRoom error:', err);
+    } finally {
+      setIsLeaving(false);
+      onLeave();
+    }
+  };
 
   const handleLeaveRoom = async () => {
     // If participant (or host in participant role), call leave_room API to remove user from room_members on server
@@ -204,6 +228,55 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
           </div>
         )}
 
+        {showDeleteConfirm && isHost && (
+          <div style={{
+            margin: '12px auto',
+            padding: '16px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '8px',
+            maxWidth: '420px',
+            textAlign: 'center',
+          }}>
+            <p style={{ margin: '0 0 12px 0', fontWeight: 600, color: '#ef4444' }}>
+              Bạn có chắc chắn muốn hủy và xóa phòng thi này không? Toàn bộ thí sinh đang đợi sẽ bị ngắt kết nối.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                onClick={handleDeleteRoom}
+                disabled={isLeaving}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  background: '#ef4444',
+                  color: '#fff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {isLeaving ? 'Đang hủy...' : 'Xác nhận hủy phòng'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDeleteConfirm(false)}
+                style={{
+                  padding: '8px 20px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border-color, #ccc)',
+                  background: 'transparent',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  color: 'var(--text-main)',
+                }}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="lobby-content">
           {isHost ? (
             <div className="host-view">
@@ -212,7 +285,7 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
               <button 
                 className="btn-start-room" 
                 onClick={handleHostStartClick}
-                disabled={isStarting || showConfirm}
+                disabled={isStarting || showConfirm || showDeleteConfirm}
               >
                 {isStarting ? 'Đang khởi động...' : 'Bắt đầu thi ngay'}
               </button>
@@ -226,13 +299,32 @@ export const LobbyPage: React.FC<LobbyPageProps> = ({
           )}
         </div>
 
-        <button 
-          className="btn-leave-room" 
-          onClick={handleLeaveRoom}
-          disabled={isLeaving}
-        >
-          {isLeaving ? 'Đang rời phòng...' : 'Rời phòng'}
-        </button>
+        {!isStarting && (
+          isHost ? (
+            <button 
+              type="button"
+              className="btn-leave-room" 
+              style={{
+                borderColor: 'rgba(239, 68, 68, 0.4)',
+                color: '#ef4444',
+                background: 'rgba(239, 68, 68, 0.05)',
+              }}
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isLeaving}
+            >
+              {isLeaving ? 'Đang hủy phòng...' : 'Hủy & Xóa phòng thi'}
+            </button>
+          ) : (
+            <button 
+              type="button"
+              className="btn-leave-room" 
+              onClick={handleLeaveRoom}
+              disabled={isLeaving}
+            >
+              {isLeaving ? 'Đang rời phòng...' : 'Rời phòng'}
+            </button>
+          )
+        )}
       </div>
     </div>
   );
