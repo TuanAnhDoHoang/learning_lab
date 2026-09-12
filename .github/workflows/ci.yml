@@ -40,6 +40,12 @@ jobs:
           docker compose config
           docker images
 
+      - name: Preserve server .env_example
+        run: |
+          if [ -f server/.env_example ]; then
+            cp server/.env_example server/.env
+          fi
+
       - name: Stop services
         if: always()
         run: docker compose --env-file /dev/null down

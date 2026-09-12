@@ -29,6 +29,8 @@ services:
       - .env
     environment:
       DATABASE_URL: "postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}"
+      # Bind server to all interfaces inside the container so other services can reach it
+      URL: "0.0.0.0:3000"
     networks:
       - learning-lab-net
 
