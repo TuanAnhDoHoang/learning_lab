@@ -25,9 +25,16 @@ jobs:
       - name: Create env file
         run: |
           mkdir -p server
+          # Các biến cho Database container
           echo "POSTGRES_USER=${{ secrets.POSTGRES_USER }}" >> server/.env
           echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}" >> server/.env
           echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}" >> server/.env
+          
+          # Các biến cho Server container (Rust)
+          echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> server/.env
+          echo "ADMIN_ROUTE=${{ secrets.ADMIN_ROUTE }}" >> server/.env
+          echo "SECRET=${{ secrets.SECRET }}" >> server/.env
+          echo "URL=${{ secrets.URL }}" >> server/.env
 
       - name: Build all services
         run: docker compose build --no-cache
