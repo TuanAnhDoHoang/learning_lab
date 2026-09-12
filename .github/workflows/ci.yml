@@ -1,0 +1,45 @@
+name: CI - Build Docker Services
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  build:
+    name: Build App & Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build all services
+        run: docker compose build --no-cache
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Wait for app to become ready
+        run: |
+          for i in {1..30}; do
+            curl -fsS http://localhost:5173 >/dev/null && curl -fsS http://localhost:3000 >/dev/null && break
+            sleep 5
+          done
+
+      - name: Verify compose configuration
+        run: |
+          docker compose config
+          docker images
+
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
