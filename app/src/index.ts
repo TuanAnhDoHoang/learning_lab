@@ -1,8 +1,17 @@
-// Matches the backend Exam struct: { id: i32, domain_id: i32, name: String }
+// Matches the backend Exam struct: { id: i32, domain_id: i32, owner_id: i32, name: String, duration: i32 }
 export interface Exam {
   id: number;
   domain_id: number;
   name: string;
+  owner_id: number;
+  duration?: number;
+}
+
+export interface UpdateExamPayload {
+  exam_id: number;
+  exam_name: string;
+  domain: string;
+  duration: number;
 }
 
 // For POST /api/new_exam
@@ -70,6 +79,7 @@ export interface ExamRoom {
   enableAntiCheat: boolean;
   participants: string[];
   status: 'waiting' | 'ready' | 'in-progress';
+  owner_id: number;
 }
 
 /* ── Anti-Cheat & Room Leaderboard Types ── */
@@ -208,4 +218,24 @@ export interface ScoreAttemptResponse {
     sum_of_question: number;
 }
 
+// room live monitoring
+export interface RoomLiveAnswerItem {
+  question_id: number;
+  answer_id: number | null;
+  updated_at: number; // Unix timestamp
+}
+
+export interface RoomMemberLiveAnswerItem {
+  user_id: number;
+  answers: RoomLiveAnswerItem[];
+}
+
+export interface RoomLiveSnapshotPayload {
+  room_id: number;
+  members: RoomMemberLiveAnswerItem[];
+}
+
+export * from './components/EditExamModal';
+export * from './components/DeleteExamModal';
+export * from './hook/useRoomLiveSocket';
 
