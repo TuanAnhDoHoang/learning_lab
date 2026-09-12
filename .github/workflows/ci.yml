@@ -42,4 +42,4 @@ jobs:
 
       - name: Stop services
         if: always()
-        run: docker compose down -v
+        run: docker compose --env-file /dev/null down
