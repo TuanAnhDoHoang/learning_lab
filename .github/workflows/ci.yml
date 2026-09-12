@@ -35,6 +35,7 @@ jobs:
           echo "ADMIN_ROUTE=${{ secrets.ADMIN_ROUTE }}" >> server/.env
           echo "SECRET=${{ secrets.SECRET }}" >> server/.env
           echo "URL=${{ secrets.URL }}" >> server/.env
+          echo "PGDATA=${{ secrets.PGDATA }}" >> server/.env
 
       - name: Build all services
         run: docker compose build --no-cache
