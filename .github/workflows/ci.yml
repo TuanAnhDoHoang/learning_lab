@@ -35,6 +35,9 @@ jobs:
       - name: Start services
         run: docker compose up -d
 
+      - name: Print Server Logs for Debugging
+        run: docker compose logs server
+
       - name: Wait for app to become ready
         run: |
           for i in {1..30}; do
