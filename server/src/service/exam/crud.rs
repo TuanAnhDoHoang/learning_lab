@@ -13,13 +13,15 @@ use crate::{
 #[diesel(table_name = exam)]
 pub struct NewExam {
     pub domain_id: i32,
+    pub owner_id: i32,
     pub name: String,
     pub duration: i32,
 }
 
-pub fn new_exam(domain_id: i32, exam_name: &str, test_duration: i32, conn: &mut PgConnection) -> anyhow::Result<Exam> {
+pub fn new_exam(owner_id: i32, domain_id: i32, exam_name: &str, test_duration: i32, conn: &mut PgConnection) -> anyhow::Result<Exam> {
     let new_exam = NewExam {
         domain_id,
+        owner_id,
         name: exam_name.to_string(),
         duration: test_duration,
     };

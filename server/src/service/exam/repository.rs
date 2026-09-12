@@ -29,6 +29,7 @@ use super::{crud::new_exam, types::CreateExamByImageRequest};
 /// - `Err(anyhow::Error)`: database/write error or invalid correct-answer index.
 pub fn create_exam_from_parsed_questions(
     conn: &mut PgConnection,
+    owner_id: i32,
     payload: &CreateExamByImageRequest,
     parsed_questions: &[ParsedQuestion],
 ) -> anyhow::Result<i32> {
@@ -41,7 +42,7 @@ pub fn create_exam_from_parsed_questions(
         }
     };
 
-    let created_exam = new_exam(domain_id, &payload.exam_name, payload.duration, conn)?;
+    let created_exam = new_exam(owner_id, domain_id, &payload.exam_name, payload.duration, conn)?;
 
     for (question_index, question) in parsed_questions.iter().enumerate() {
         let created_question = new_question(created_exam.id, question.question.as_str(), conn)?;

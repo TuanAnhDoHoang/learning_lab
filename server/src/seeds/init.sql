@@ -15,18 +15,26 @@ INSERT INTO domain (id, name) VALUES
     (3, 'Hóa học');
 
 -- ---------------------------------------------------------
--- 2. EXAM
+-- 2. USERS (Thông tin người dùng)
 -- ---------------------------------------------------------
-INSERT INTO exam (id, domain_id, name, duration) VALUES
-    (1, 1, 'Kiểm tra 15 phút - Đại số', 15),
-    (2, 1, 'Kiểm tra 15 phút - Hình học', 15),
-    (3, 2, 'Kiểm tra 15 phút - Cơ học', 15),
-    (4, 2, 'Kiểm tra 15 phút - Điện học', 15),
-    (5, 3, 'Kiểm tra 15 phút - Hóa vô cơ', 15),
-    (6, 3, 'Kiểm tra 15 phút - Hóa hữu cơ', 15);
+INSERT INTO users (id, email, name, password, role) VALUES
+    (1, 'anhdoo1211@gmail.com', 'anhdoo', '$2b$12$13Wi9KoLf5rjyKZiXKQit.l8sAyrmP4JjFoPoi4GaZItEHffEWNES', 'admin'),
+    (2, 'user@gmail.com', 'scibidi', '$2b$12$wrR6huHjUvxxCf8aPvgJJejbCsnbZwbmnC/DWWHrmw9axRPhGTFMu', 'user'),
+    (3, 'anhdoo@gmail.com', 'anhdoo9090', '$2b$12$oErhlNnbBnXZr.wCBF4dV.xKskcoXbdaolMYGQFgWMwGe0Z4.ydQq', 'admin');
 
 -- ---------------------------------------------------------
--- 3. QUESTION
+-- 3. EXAM
+-- ---------------------------------------------------------
+INSERT INTO exam (id, domain_id, owner_id, name, duration) VALUES
+    (1, 1, 1, 'Kiểm tra 15 phút - Đại số', 15),
+    (2, 1, 1, 'Kiểm tra 15 phút - Hình học', 15),
+    (3, 2, 1, 'Kiểm tra 15 phút - Cơ học', 15),
+    (4, 2, 1, 'Kiểm tra 15 phút - Điện học', 15),
+    (5, 3, 1, 'Kiểm tra 15 phút - Hóa vô cơ', 15),
+    (6, 3, 1, 'Kiểm tra 15 phút - Hóa hữu cơ', 15);
+
+-- ---------------------------------------------------------
+-- 4. QUESTION
 -- ---------------------------------------------------------
 INSERT INTO question (id, exam_id, content) VALUES
     -- Exam 1: Đại số
@@ -177,23 +185,14 @@ INSERT INTO answer_map (question_id, answer_id) VALUES
     (17, 65), -- C2H5OH
     (18, 69); -- Metan (CH4)
 
-
 -- ---------------------------------------------------------
--- 6. USERS (Thông tin người dùng)
--- ---------------------------------------------------------
-INSERT INTO users (id, email, name, password, role) VALUES
-    (1, 'anhdoo1211@gmail.com', 'anhdoo', '$2b$12$13Wi9KoLf5rjyKZiXKQit.l8sAyrmP4JjFoPoi4GaZItEHffEWNES', 'admin'),
-    (2, 'user@gmail.com', 'scibidi', '$2b$12$wrR6huHjUvxxCf8aPvgJJejbCsnbZwbmnC/DWWHrmw9axRPhGTFMu', 'user'),
-    (3, 'anhdoo@gmail.com', 'anhdoo9090', '$2b$12$oErhlNnbBnXZr.wCBF4dV.xKskcoXbdaolMYGQFgWMwGe0Z4.ydQq', 'admin');
-
--- ---------------------------------------------------------
--- 7. Đồng bộ lại sequence sau khi insert id thủ công
+-- 6. Đồng bộ lại sequence sau khi insert id thủ công
 -- (bắt buộc vì các cột id là SERIAL/auto-increment)
 -- ---------------------------------------------------------
 SELECT setval(pg_get_serial_sequence('domain', 'id'), (SELECT MAX(id) FROM domain));
+SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users));
 SELECT setval(pg_get_serial_sequence('exam', 'id'), (SELECT MAX(id) FROM exam));
 SELECT setval(pg_get_serial_sequence('question', 'id'), (SELECT MAX(id) FROM question));
 SELECT setval(pg_get_serial_sequence('answer', 'id'), (SELECT MAX(id) FROM answer));
-SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users));
 
 COMMIT;

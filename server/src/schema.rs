@@ -46,6 +46,7 @@ diesel::table! {
     exam (id) {
         id -> Int4,
         domain_id -> Int4,
+        owner_id -> Int4,
         name -> Text,
         duration -> Int4,
     }
@@ -125,6 +126,7 @@ diesel::joinable!(answer_history -> answer (answer_id));
 diesel::joinable!(answer_history -> exam_attempt (exam_attempt_id));
 diesel::joinable!(answer_history -> question (question_id));
 diesel::joinable!(exam -> domain (domain_id));
+diesel::joinable!(exam -> users (owner_id));
 diesel::joinable!(exam_attempt -> exam (exam_id));
 diesel::joinable!(exam_attempt -> users (user_id));
 diesel::joinable!(question -> exam (exam_id));

@@ -1,0 +1,2 @@
+ALTER TABLE exam DROP CONSTRAINT IF EXISTS exam_owner_id_fkey;
+ALTER TABLE exam DROP COLUMN IF EXISTS owner_id;

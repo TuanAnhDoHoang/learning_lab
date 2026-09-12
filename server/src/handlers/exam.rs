@@ -3,7 +3,8 @@ use axum::{
     extract::{Multipart, State},
     http::StatusCode,
 };
-use diesel::{Connection, RunQueryDsl};
+use diesel::{Connection, ExpressionMethods, QueryDsl, RunQueryDsl};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     AppState,
@@ -35,9 +36,32 @@ use crate::{
 //     ))
 // }
 
+#[derive(Deserialize)]
+pub struct DeleteExamRequest {
+    pub exam_id: i32,
+}
+
+#[derive(Serialize)]
+pub struct DeleteExamResponse {
+    pub exam_id: i32,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateExamRequest {
+    pub exam_id: i32,
+    pub exam_name: String,
+    pub domain: String,
+    pub duration: i32,
+}
+
+#[derive(Serialize)]
+pub struct UpdateExamResponse {
+    pub exam_id: i32,
+}
+
 pub async fn create_new_exam(
     State(app_state): State<AppState>,
-    Extension(_user): Extension<Users>,
+    Extension(user): Extension<Users>,
     Json(payload): Json<CreateExamRequest>,
 ) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
     let mut conn = app_state.db_pool.get().map_err(|e| {
@@ -70,7 +94,7 @@ pub async fn create_new_exam(
             }
         };
 
-        let created_exam = new_exam(domain_id, &payload.exam_name, payload.duration, conn)
+        let created_exam = new_exam(user.id, domain_id, &payload.exam_name, payload.duration, conn)
             .map_err(|e| {
                 diesel::result::Error::QueryBuilderError(
                     format!("Error during create new exam {}", e).into(),
@@ -155,7 +179,7 @@ pub async fn get_exams(
 
 pub async fn create_new_exam_by_image(
     State(app_state): State<AppState>,
-    Extension(_user): Extension<Users>,
+    Extension(user): Extension<Users>,
     mut multipart: Multipart,
 ) -> Result<Json<CreateExamResponse>, (StatusCode, String)> {
     let mut conn = app_state.db_pool.get().map_err(|e| {
@@ -204,7 +228,7 @@ pub async fn create_new_exam_by_image(
             }
         }
 
-        let exam_id = create_exam_from_parsed_questions(conn, &payload, &parsed)
+        let exam_id = create_exam_from_parsed_questions(conn, user.id, &payload, &parsed)
             .map_err(|e| diesel::result::Error::QueryBuilderError(format!("{}", e).into()))?;
 
         new_exam_id = exam_id;
@@ -228,4 +252,109 @@ pub async fn create_new_exam_by_image(
     } else {
         Ok(Json(CreateExamResponse { exam_id: new_exam_id }))
     }
+}
+
+pub async fn delete_exam(
+    State(app_state): State<AppState>,
+    Extension(user): Extension<Users>,
+    Json(req): Json<DeleteExamRequest>,
+) -> Result<Json<DeleteExamResponse>, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+
+    let exam_row = exam::table
+        .filter(exam::id.eq(req.exam_id))
+        .first::<Exam>(&mut conn)
+        .map_err(|_| (StatusCode::NOT_FOUND, format!("Exam {} not found", req.exam_id)))?;
+
+    if exam_row.owner_id != user.id {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            format!("You don't have permission to delete exam {}", req.exam_id),
+        ));
+    }
+
+    let question_ids: Vec<i32> = crate::schema::question::table
+        .filter(crate::schema::question::exam_id.eq(req.exam_id))
+        .select(crate::schema::question::id)
+        .load(&mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error loading questions: {}", e)))?;
+
+    if !question_ids.is_empty() {
+        diesel::delete(
+            crate::schema::answer_map::table
+                .filter(crate::schema::answer_map::question_id.eq_any(&question_ids)),
+        )
+        .execute(&mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error deleting answer_map: {}", e)))?;
+
+        diesel::delete(
+            crate::schema::answer::table
+                .filter(crate::schema::answer::question_id.eq_any(&question_ids)),
+        )
+        .execute(&mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error deleting answers: {}", e)))?;
+    }
+
+    diesel::delete(crate::schema::question::table.filter(crate::schema::question::exam_id.eq(req.exam_id)))
+        .execute(&mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error deleting questions: {}", e)))?;
+
+    diesel::delete(exam::table.filter(exam::id.eq(req.exam_id)))
+        .execute(&mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error deleting exam: {}", e)))?;
+
+    Ok(Json(DeleteExamResponse { exam_id: req.exam_id }))
+}
+
+pub async fn update_exam(
+    State(app_state): State<AppState>,
+    Extension(user): Extension<Users>,
+    Json(req): Json<UpdateExamRequest>,
+) -> Result<Json<UpdateExamResponse>, (StatusCode, String)> {
+    let mut conn = app_state.db_pool.get().map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Can not connect to database: {}", e),
+        )
+    })?;
+
+    let exam_row = exam::table
+        .filter(exam::id.eq(req.exam_id))
+        .first::<Exam>(&mut conn)
+        .map_err(|_| (StatusCode::NOT_FOUND, format!("Exam {} not found", req.exam_id)))?;
+
+    if exam_row.owner_id != user.id {
+        return Err((
+            StatusCode::UNAUTHORIZED,
+            format!("You don't have permission to update exam {}", req.exam_id),
+        ));
+    }
+
+    let domain_existed = crate::service::domain::get_existed_domain(&req.domain, &mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error during update domain {}", e)))?;
+
+    let domain_id = match domain_existed {
+        Some(domain) => domain.id,
+        None => {
+            let domain = crate::service::domain::new_domain(&req.domain, &mut conn)
+                .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error during create new domain {}", e)))?;
+            domain.id
+        }
+    };
+
+    diesel::update(exam::table.filter(exam::id.eq(req.exam_id)))
+        .set((
+            exam::domain_id.eq(domain_id),
+            exam::name.eq(req.exam_name.as_str()),
+            exam::duration.eq(req.duration),
+        ))
+        .execute(&mut conn)
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("Error updating exam: {}", e)))?;
+
+    Ok(Json(UpdateExamResponse { exam_id: req.exam_id }))
 }

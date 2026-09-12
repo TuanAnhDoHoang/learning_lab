@@ -231,6 +231,75 @@ async fn create_exam_accepts_partial_right_answers() {
 }
 
 #[tokio::test]
+async fn exam_owner_permissions_are_enforced() {
+    let _server = TestServer::start().await;
+    let client = Client::new();
+
+    let admin_login =
+        auth::login_user(&client, helpers::ADMIN_EMAIL, helpers::ADMIN_PASSWORD).await;
+    let admin_token = admin_login["access_token"].as_str().unwrap().to_string();
+
+    let user_email = format!("owner_test_{}@gmail.com", chrono::Utc::now().timestamp_millis());
+    let _ = register_user(&client, &user_email, "ownertestuser", "Pass#1234").await;
+    let user_login = auth::login_user(&client, &user_email, "Pass#1234").await;
+    let user_token = user_login["access_token"].as_str().unwrap().to_string();
+
+    let exam = exam::create_exam(
+        &client,
+        &admin_token,
+        "Owner permissions exam",
+        "Lập trình Backend",
+    )
+    .await;
+    let exam_id = exam["exam_id"].as_i64().unwrap() as i32;
+
+    let non_owner_delete = client
+        .post(format!("{}/api/delete_exam", helpers::BASE_URL))
+        .header("Authorization", format!("Bearer {}", user_token))
+        .json(&serde_json::json!({ "exam_id": exam_id }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(
+        non_owner_delete.status(), reqwest::StatusCode::UNAUTHORIZED,
+        "non-owner should not delete another user's exam"
+    );
+
+    let non_owner_update = client
+        .post(format!("{}/api/update_exam", helpers::BASE_URL))
+        .header("Authorization", format!("Bearer {}", user_token))
+        .json(&serde_json::json!({
+            "exam_id": exam_id,
+            "exam_name": "Should fail",
+            "domain": "Hacked Domain",
+            "duration": 30
+        }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert_eq!(
+        non_owner_update.status(), reqwest::StatusCode::UNAUTHORIZED,
+        "non-owner should not update another user's exam"
+    );
+
+    let owner_delete = client
+        .post(format!("{}/api/delete_exam", helpers::BASE_URL))
+        .header("Authorization", format!("Bearer {}", admin_token))
+        .json(&serde_json::json!({ "exam_id": exam_id }))
+        .send()
+        .await
+        .expect("request failed");
+
+    assert!(
+        owner_delete.status().is_success(),
+        "owner should be able to delete their exam; got status {}",
+        owner_delete.status()
+    );
+}
+
+#[tokio::test]
 #[ignore]
 async fn create_exam_by_image_route_test() {
     let _server = TestServer::start().await;
