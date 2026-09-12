@@ -248,7 +248,7 @@ export const App: React.FC = () => {
         roomId={takingExamSession.roomId}
         roomCode={takingExamSession.roomCode}
         onBack={() => setTakingExamSession(null)}
-        onSwitchToProctor={(remainingSeconds) => {
+        onSwitchToProctor={(remainingSeconds: number) => {
           if (takingExamSession.roomId && takingExamSession.isHost) {
             setTakingExamSession(prev => prev ? {
               ...prev,
@@ -298,7 +298,14 @@ export const App: React.FC = () => {
           onOpenSettings={handleOpenSettings}
         />
         <RoomPage
-          onRoomJoined={(roomId, roomCode, isHost, examId, durationMinutes, hostRole) => {
+          onRoomJoined={(
+            roomId: number,
+            roomCode: string,
+            isHost: boolean,
+            examId?: number,
+            durationMinutes?: number,
+            hostRole?: HostRoleMode
+          ) => {
             setLobbySession({ roomId, roomCode, isHost, examId, durationMinutes, hostRole });
             setCurrentView('lobby');
           }}
