@@ -13,6 +13,7 @@ services:
     networks:
       - learning-lab-net
 
-networks:
-  learning-lab-net:
-    external: true
+# #comment when run root docker compose 
+# networks:
+#   learning-lab-net:
+#     external: true
