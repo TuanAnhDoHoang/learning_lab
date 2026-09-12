@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::service::room::RoomStatus;
 use crate::service::users::ROLE;
 use chrono::NaiveDateTime;

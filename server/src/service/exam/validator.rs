@@ -47,6 +47,7 @@ pub fn validate_answer_index(right_index: usize, answer_count: usize) -> Result<
 /// # Returns
 /// - `Ok(())` when the counts match.
 /// - `Err(String)` when the client provides a mismatch.
+#[allow(dead_code)]
 pub fn validate_answer_count(submitted_count: usize, question_count: usize) -> Result<(), String> {
     if submitted_count != question_count {
         return Err(format!(

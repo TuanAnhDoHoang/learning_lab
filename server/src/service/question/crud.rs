@@ -1,7 +1,7 @@
-use diesel::{query_dsl::methods::FilterDsl, ExpressionMethods, Insertable, PgConnection, QueryableByName, RunQueryDsl};
+use diesel::{PgConnection, RunQueryDsl, query_dsl::methods::FilterDsl, ExpressionMethods};
 
 use crate::{
-    postgres::schema::{Answer, Question},
+    postgres::schema::Question,
     schema::question,
 };
 
@@ -23,6 +23,7 @@ pub fn get_questions_by_exam(exam_id: i32, conn: &mut PgConnection) -> anyhow::R
     Ok(questions)
 }
 
+#[allow(dead_code)]
 pub fn get_one_question(exam_id: i32, question_content: &str, conn: &mut PgConnection) -> anyhow::Result<Question> {
     let question_exist = question::table
         .filter(question::exam_id.eq(exam_id))

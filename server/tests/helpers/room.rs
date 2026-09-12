@@ -1,8 +1,7 @@
 use serde_json::json;
 use serde_json::Value;
 use reqwest::Client;
-use diesel::Connection;
-use super::{send_json, get_db_url, RoomCodeRow};
+use super::send_json;
 
 pub async fn create_room(client: &Client, token: &str, name: &str, exam_id: i32, duration: i32) -> Value {
     send_json(

@@ -6,7 +6,7 @@ use diesel::{query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
 use serde::Deserialize;
 
 use crate::{
-    AppState, postgres::schema::{RefeshToken, Users}, schema::{refresh_tokens, users}, service::{
+    AppState, postgres::schema::{Users}, schema::{refresh_tokens, users}, service::{
         token::{self, RefeshRequest, insert_token}, users::{
             LoginRequest, LoginResponse, ProvidePriviligedResponse, ROLE, RegisterRequest, RegisterResponse, check_email_exist, check_username_exist, find_user_by_email, new_user,
         },

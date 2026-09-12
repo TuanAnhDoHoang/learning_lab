@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use diesel::PgConnection;
 
 use crate::{

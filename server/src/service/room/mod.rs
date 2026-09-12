@@ -160,6 +160,7 @@ pub fn new_room(
     Ok(created)
 }
 
+#[allow(dead_code)]
 pub fn ongoing(room: &Room, conn: &mut PgConnection) -> anyhow::Result<Vec<i32>> {
     let duration_minutes = room.duration;
     let time_start = Utc::now().naive_utc();

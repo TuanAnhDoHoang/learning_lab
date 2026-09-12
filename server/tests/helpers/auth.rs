@@ -27,6 +27,7 @@ pub async fn login_user(client: &Client, email: &str, password: &str) -> Value {
     .await
 }
 
+#[allow(dead_code)]
 pub async fn register_multiple_users(
     client: &Client,
     base: &str,
@@ -46,6 +47,7 @@ pub async fn register_multiple_users(
     results
 }
 
+#[allow(dead_code)]
 pub async fn refresh_token(client: &Client, refresh_token: &str) -> Value {
     send_json(
         "POST /auth/refresh",
@@ -58,6 +60,7 @@ pub async fn refresh_token(client: &Client, refresh_token: &str) -> Value {
     .await
 }
 
+#[allow(dead_code)]
 pub async fn logout_user(client: &Client, token: &str, refresh_token: &str) -> Value {
     send_json(
         "POST /auth/logout",

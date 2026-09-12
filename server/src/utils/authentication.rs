@@ -56,11 +56,31 @@ pub struct RegisterData {
     pub role: ROLE,
 }
 
+#[allow(dead_code)]
 pub trait Credentials {
     fn validate_credentials(&self) -> Result<(), String>;
     fn username(&self) -> Option<Username>;
     fn email(&self) -> Email;
     fn password(&self) -> Password;
+}
+
+impl Credentials for LoginData {
+    #[allow(dead_code)]
+    fn validate_credentials(&self) -> Result<(), String> {
+        self.validate().map_err(|e| e.to_string())
+    }
+    #[allow(dead_code)]
+    fn username(&self) -> Option<Username> {
+        None
+    }
+    #[allow(dead_code)]
+    fn email(&self) -> Email {
+        self.email.clone()
+    }
+    #[allow(dead_code)]
+    fn password(&self) -> Password {
+        self.password.clone()
+    }
 }
 
 impl Credentials for RegisterData {
@@ -69,20 +89,6 @@ impl Credentials for RegisterData {
     }
     fn username(&self) -> Option<Username> {
         Some(self.username.clone())
-    }
-    fn email(&self) -> Email {
-        self.email.clone()
-    }
-    fn password(&self) -> Email {
-        self.password.clone()
-    }
-}
-impl Credentials for LoginData {
-    fn validate_credentials(&self) -> Result<(), String> {
-        self.validate().map_err(|e| e.to_string())
-    }
-    fn username(&self) -> Option<Username> {
-        None
     }
     fn email(&self) -> Email {
         self.email.clone()

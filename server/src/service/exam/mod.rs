@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 mod crud;
 mod multipart;
 mod repository;

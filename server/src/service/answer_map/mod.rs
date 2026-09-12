@@ -6,8 +6,9 @@ use diesel::PgConnection;
 use diesel::QueryableByName;
 use diesel::RunQueryDsl;
 use diesel::query_dsl::methods::FilterDsl;
+
 #[derive(Debug, Insertable, QueryableByName)]
-#[table_name = "answer_map"]
+#[diesel(table_name = answer_map)]
 pub struct NewAnswerMap {
     pub question_id: i32,
     pub answer_id: i32,
@@ -30,6 +31,7 @@ pub fn new_answer_map(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub fn get_answer_map(question_id: i32, conn: &mut PgConnection) -> anyhow::Result<AnswerMap> {
     let answer_map = answer_map::table
         .filter(answer_map::question_id.eq(question_id))

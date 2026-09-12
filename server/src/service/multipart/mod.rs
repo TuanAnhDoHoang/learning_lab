@@ -3,6 +3,7 @@ use axum::extract::Multipart;
 use std::path::PathBuf;
 use uuid::Uuid;
 
+#[allow(dead_code)]
 pub async fn handle_multipart(mp: &mut Multipart) -> anyhow::Result<String> {
     // iterate through fields and handle the first file field we find
     while let Some(field) = mp.next_field().await? {

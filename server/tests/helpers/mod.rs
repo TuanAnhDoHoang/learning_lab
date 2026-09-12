@@ -1,6 +1,5 @@
 use std::{process::Child, time::{Duration, SystemTime, UNIX_EPOCH}};
 
-use diesel::{sql_types::Text, QueryableByName, Connection, PgConnection, RunQueryDsl};
 use reqwest::{Client, StatusCode};
 use serde_json::Value;
 
@@ -50,12 +49,7 @@ impl Drop for TestServer {
     }
 }
 
-#[derive(QueryableByName)]
-pub struct RoomCodeRow {
-    #[diesel(sql_type = Text)]
-    pub code: String,
-}
-
+#[allow(dead_code)]
 pub fn now_millis() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -114,12 +108,6 @@ pub async fn send_json(
         body
     );
     serde_json::from_str(&body).unwrap_or(serde_json::Value::Null)
-}
-
-pub fn get_db_url() -> String {
-    std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://postgres:Anhdoo#1004@localhost:5432/learning_lab".to_string()
-    })
 }
 
 pub mod auth;

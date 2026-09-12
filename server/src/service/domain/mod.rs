@@ -7,8 +7,9 @@ use diesel::OptionalExtension;
 use diesel::PgConnection;
 use diesel::QueryableByName;
 use diesel::RunQueryDsl;
+
 #[derive(Debug, Insertable, QueryableByName)]
-#[table_name = "domain"]
+#[diesel(table_name = domain)]
 pub struct NewDomain<'a> {
     pub name: &'a str,
 }

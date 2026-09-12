@@ -21,6 +21,7 @@ pub fn get_answers_by_question(question_id: i32, conn: &mut PgConnection) -> any
     Ok(answers)
 }
 
+#[allow(dead_code)]
 pub fn get_one_answer(question_id: i32, content: &str, conn: &mut PgConnection) -> anyhow::Result<Answer> {
     let answer_exist = answer::table
         .filter(answer::question_id.eq(question_id))

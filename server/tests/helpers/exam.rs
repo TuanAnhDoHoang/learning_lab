@@ -3,6 +3,7 @@ use serde_json::Value;
 use reqwest::Client;
 use super::send_json;
 
+#[allow(dead_code)]
 pub async fn get_exams(client: &Client, token: &str) -> Value {
     send_json(
         "GET /api/exams",
@@ -35,6 +36,7 @@ pub async fn create_exam(client: &Client, token: &str, exam_name: &str, domain: 
     .await
 }
 
+#[allow(dead_code)]
 pub async fn get_questions(client: &Client, token: &str, exam_id: i32) -> Value {
     let path = format!("/api/questions?exam_id={}", exam_id);
     send_json(
@@ -48,6 +50,7 @@ pub async fn get_questions(client: &Client, token: &str, exam_id: i32) -> Value 
     .await
 }
 
+#[allow(dead_code)]
 pub async fn start_exam_attempt(client: &Client, token: &str, exam_id: i32) -> Value {
     send_json(
         "POST /api/start_exam_attempt",
@@ -60,6 +63,7 @@ pub async fn start_exam_attempt(client: &Client, token: &str, exam_id: i32) -> V
     .await
 }
 
+#[allow(dead_code)]
 pub async fn get_time_attempt_end(client: &Client, token: &str, exam_attempt_id: i32) -> Value {
     send_json(
         "POST /api/time_attempt_end",
@@ -84,6 +88,7 @@ pub async fn save_user_answer(client: &Client, token: &str, exam_attempt_id: i32
     .await
 }
 
+#[allow(dead_code)]
 pub async fn get_attempt(client: &Client, token: &str, exam_attempt_id: i32) -> Value {
     let path = format!("/api/attempt?exam_attempt_id={}", exam_attempt_id);
     send_json(
@@ -97,6 +102,7 @@ pub async fn get_attempt(client: &Client, token: &str, exam_attempt_id: i32) -> 
     .await
 }
 
+#[allow(dead_code)]
 pub async fn score_attempt(client: &Client, token: &str, exam_attempt_id: i32) -> Value {
     let path = format!("/api/score_attempt?exam_attempt_id={}", exam_attempt_id);
     send_json(

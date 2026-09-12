@@ -1,15 +1,15 @@
 use std::env;
 
 use crate::schema::refresh_tokens;
-use anyhow::anyhow;
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use chrono::NaiveDateTime;
 use chrono::Utc;
 use diesel::Insertable;
 use diesel::PgConnection;
 use diesel::QueryableByName;
+
 #[derive(Debug, Insertable, QueryableByName)]
-#[table_name = "refresh_tokens"]
+#[diesel(table_name = refresh_tokens)]
 pub struct NewRefeshToken<'a> {
     pub token_hash: &'a str,
     pub user_id: i32,

@@ -1,6 +1,6 @@
 
-use anyhow::Context;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use regex::Regex;
 use reqwest::Client;
 use serde_json::json;
@@ -34,7 +34,7 @@ Yêu cầu:
 
 
     let data = fs::read(image_path).context("failed to read image file")?;
-    let image_b64 = base64::encode(&data);
+    let image_b64 = STANDARD.encode(&data);
     let mime_type = "image/jpeg"; // adjust if you use PNG etc.
 
     let payload = json!({
