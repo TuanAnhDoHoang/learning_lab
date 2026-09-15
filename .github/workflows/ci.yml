@@ -36,6 +36,8 @@ jobs:
           echo "SECRET=${{ secrets.SECRET }}" >> server/.env
           echo "URL=${{ secrets.URL }}" >> server/.env
           echo "PGDATA=${{ secrets.PGDATA }}" >> server/.env
+          echo "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" >> server/.env
+          echo "GEMINI_MODEL=${{ secrets.GEMINI_MODEL }}" >> server/.env
 
       - name: Build all services
         run: docker compose build --no-cache
