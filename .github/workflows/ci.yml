@@ -62,9 +62,15 @@ jobs:
       - name: Print Server Logs for Debugging
         run: docker compose logs server
 
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        
       - name: Run server API tests
-        run: |
-          docker compose run --rm --no-deps server cargo test --test api -- --nocapture
+        working-directory: ./server # Đổi lại nếu thư mục chứa file Cargo.toml của bạn có tên khác
+        env:
+          # Cấu hình biến môi trường kết nối với Postgres đang chạy trong Docker
+          DATABASE_URL: "postgres://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}"
+        run: cargo test --test api -- --nocapture
 
       - name: Wait for app to become ready
         run: |
