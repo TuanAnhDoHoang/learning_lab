@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -8,6 +10,8 @@ use diesel::{
     query_dsl::methods::{FilterDsl, OrderDsl, SelectDsl},
     Connection, ExpressionMethods, OptionalExtension, RunQueryDsl,
 };
+use rand::Rng;
+use tokio::time::sleep;
 
 use crate::{
     postgres::schema::Users,
@@ -229,6 +233,9 @@ pub async fn create_exam_attempt_by_room(
 ) -> Result<Json<CreateExamAttemptResponse>, (StatusCode, String)> {
     use crate::schema::room;
     use crate::schema::room_member;
+
+    let delay_ms = rand::thread_rng().gen_range(1..=100);
+    sleep(Duration::from_millis(delay_ms)).await;
 
     let mut conn = app_state.db_pool.get().map_err(|e| {
         (
