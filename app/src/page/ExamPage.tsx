@@ -9,7 +9,6 @@ import {
 interface QuestionWithAnswers {
   question: Question;
   answers: Answer[];
-  rightAnswerIndex?: number;
 }
 
 interface QuestionsResponse {
@@ -217,7 +216,6 @@ export const ExamPage: React.FC<ExamPageProps> = ({
           question_id: cq.id || idx + 1,
           content: ansText,
         })),
-        rightAnswerIndex: cq.rightAnswerIndex,
       }));
       setQuestionsData(formatted);
       setLoading(false);
@@ -609,60 +607,30 @@ export const ExamPage: React.FC<ExamPageProps> = ({
     let finalScore = 0;
     const totalQ = questionsData.length || 1;
 
-    // Calculate score locally first (for instant offline grading or custom exams)
-    if (customExamData && customExamData.questions?.length > 0) {
-      let correctCount = 0;
-      questionsData.forEach(qa => {
-        const selectedAnswerId = selectedAnswers[qa.question.id];
-        if (selectedAnswerId !== undefined && qa.rightAnswerIndex !== undefined) {
-          const selectedIdx = qa.answers.findIndex(a => a.id === selectedAnswerId);
-          if (selectedIdx === qa.rightAnswerIndex) {
-            correctCount++;
-          }
-        }
-      });
-      finalScore = correctCount;
-    } else {
-      // Backend scoring payload
-      const payload = {
-        exam_id: examId,
-        questions: questionsData.map(qa => ({
-          question_id: qa.question.id,
-          answer_id: selectedAnswers[qa.question.id] || 0,
-        })),
-      };
+    // Backend scoring: Chỉ gửi đáp án đã chọn lên server, server tự chấm kết quả bảo mật
+    const payload = {
+      exam_id: examId,
+      questions: questionsData.map(qa => ({
+        question_id: qa.question.id,
+        answer_id: selectedAnswers[qa.question.id] || 0,
+      })),
+    };
 
-      if (navigator.onLine) {
-        // Client-side Jitter: If auto-submitting on timeout (00:00), add a short randomized delay (100ms - 1000ms)
-        if (timeLeft <= 0) {
-          const jitterMs = Math.floor(Math.random() * 900) + 100;
-          await new Promise(resolve => setTimeout(resolve, jitterMs));
-        }
+    if (navigator.onLine) {
+      // Client-side Jitter: If auto-submitting on timeout (00:00), add a short randomized delay (100ms - 1000ms)
+      if (timeLeft <= 0) {
+        const jitterMs = Math.floor(Math.random() * 900) + 100;
+        await new Promise(resolve => setTimeout(resolve, jitterMs));
+      }
 
-        // If attemptId exists, score via score_attempt to persist mark into database
-        if (attemptId) {
-          try {
-            const scoreRes = await scoreAttempt(attemptId);
-            finalScore = scoreRes.score;
-            setIsOfflineSubmitted(false);
-          } catch (scoreErr) {
-            console.warn('scoreAttempt failed, trying /api/score:', scoreErr);
-            try {
-              const res = await fetchWithAuth('/api/score', {
-                method: 'POST',
-                body: JSON.stringify(payload),
-              });
-              if (res.ok) {
-                const result = await res.json();
-                finalScore = result.score;
-                setIsOfflineSubmitted(false);
-              }
-            } catch {
-              setIsOfflineSubmitted(true);
-              finalScore = Math.round(totalQ * 0.7);
-            }
-          }
-        } else {
+      // If attemptId exists, score via score_attempt to persist mark into database
+      if (attemptId) {
+        try {
+          const scoreRes = await scoreAttempt(attemptId);
+          finalScore = scoreRes.score;
+          setIsOfflineSubmitted(false);
+        } catch (scoreErr) {
+          console.warn('scoreAttempt failed, trying /api/score:', scoreErr);
           try {
             const res = await fetchWithAuth('/api/score', {
               method: 'POST',
@@ -674,16 +642,31 @@ export const ExamPage: React.FC<ExamPageProps> = ({
               setIsOfflineSubmitted(false);
             }
           } catch {
-            // Network error during submit -> save pending sync
             setIsOfflineSubmitted(true);
-            finalScore = Math.round(totalQ * 0.7); // Fallback estimate until sync
+            finalScore = 0;
           }
         }
       } else {
-        // Offline submit mode
-        setIsOfflineSubmitted(true);
-        finalScore = Math.round(totalQ * 0.7); // Local grading estimate
+        try {
+          const res = await fetchWithAuth('/api/score', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const result = await res.json();
+            finalScore = result.score;
+            setIsOfflineSubmitted(false);
+          }
+        } catch {
+          // Network error during submit -> save pending sync
+          setIsOfflineSubmitted(true);
+          finalScore = 0;
+        }
       }
+    } else {
+      // Offline submit mode (chờ đồng bộ lên server khi có mạng)
+      setIsOfflineSubmitted(true);
+      finalScore = 0;
     }
 
     // Clean up local progress cache

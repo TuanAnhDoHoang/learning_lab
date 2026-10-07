@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { getAccessToken } from '../api/apicaller';
 import { RoomLiveSnapshotPayload } from '..';
 
 export interface UseRoomLiveSocketReturn {
@@ -25,15 +24,14 @@ export const useRoomLiveSocket = (
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isUnmountedRef = useRef<boolean>(false);
 
-  // Hàm tạo URL WebSocket kèm Access Token
+  // Hàm tạo URL WebSocket - Xác thực bảo mật qua HttpOnly Cookie trong Handshake (không lộ token trên URL)
   const getSocketUrl = useCallback(() => {
-    const token = getAccessToken();
-    if (!token || !roomId) return null;
+    if (!roomId) return null;
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Backend chạy ở cổng 3000
-    const host = window.location.hostname === 'localhost' ? 'localhost:3000' : window.location.host;
-    return `${protocol}//${host}/api/room_live_answers?room_id=${roomId}&access_token=${encodeURIComponent(token)}`;
+    // Kết nối qua reverse proxy cùng Origin để trình duyệt tự động gửi HttpOnly Cookie
+    const host = window.location.host;
+    return `${protocol}//${host}/api/room_live_answers?room_id=${roomId}`;
   }, [roomId]);
 
   // Hàm kết nối WebSocket
@@ -42,7 +40,7 @@ export const useRoomLiveSocket = (
 
     const url = getSocketUrl();
     if (!url) {
-      setError('Thiếu Access Token hoặc mã phòng thi');
+      setError('Thiếu mã phòng thi');
       return;
     }
 
