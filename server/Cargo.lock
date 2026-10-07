@@ -2101,6 +2101,7 @@ dependencies = [
  "hex",
  "infer",
  "jsonwebtoken",
+ "rand 0.8.7",
  "regex",
  "reqwest",
  "serde",

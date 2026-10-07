@@ -12,6 +12,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
       PGDATA: ${PGDATA}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
     volumes:
       - pgdata:/var/lib/postgresql/data/pgdata
     networks:
@@ -39,4 +41,4 @@ volumes:
 
 # networks:
 #   learning-lab-net:
-#     driver: bridge
+#     external: true 
