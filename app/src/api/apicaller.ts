@@ -5,23 +5,42 @@ const AUTH_BASE = '/auth';
 const ACCESS_TOKEN_KEY = 'lab_train_access_token';
 const REFRESH_TOKEN_KEY = 'lab_train_refresh_token';
 
+function setSecureCookie(name: string, value: string, days: number = 30) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  const isSecure = window.location.protocol === 'https:' ? '; Secure' : '';
+  document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax${isSecure}`;
+}
+
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; SameSite=Lax`;
+}
+
 export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return getCookie(REFRESH_TOKEN_KEY) || localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function setTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  // Không lưu Refresh Token trong localStorage để phòng chống token theft qua XSS
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  // Lưu Refresh Token vào Cookie kèm các cờ SameSite=Lax, Path=/ và Secure (nếu HTTPS)
+  setSecureCookie(REFRESH_TOKEN_KEY, refreshToken, 30);
 }
 
 export function clearTokens() {
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem('lab_train_user');
+  deleteCookie(REFRESH_TOKEN_KEY);
 }
 
 export function isAuthenticated(): boolean {
