@@ -1,0 +1,15 @@
+services:
+  file2exam:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: file2exam-service
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    networks:
+      - learning-lab-net
+
+networks:
+  learning-lab-net:
+    driver: bridge

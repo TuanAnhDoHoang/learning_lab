@@ -110,7 +110,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
 }
 
 /* ── API Endpoints ── */
-import { CreateExamPayload, CreateExamByImagePayload } from '../index';
+import { CreateExamPayload, CreateExamByImagePayload, QuestionPayload } from '../index';
 
 // Compress image to ensure it is under 1MB for backend upload
 export async function compressImage(file: File, maxSizeBytes = 950000): Promise<File> {
@@ -180,7 +180,7 @@ export async function compressImage(file: File, maxSizeBytes = 950000): Promise<
 export async function createExamByImage(
   payload: CreateExamByImagePayload,
   file: File
-): Promise<{ exam_id: number }> {
+): Promise<QuestionPayload[]> {
   const optimizedFile = await compressImage(file);
   const formData = new FormData();
   formData.append('payload', JSON.stringify(payload));
@@ -209,6 +209,39 @@ export async function createExam(payload: CreateExamPayload) {
     throw new Error(`Failed to create exam: ${errorMsg || res.statusText}`);
   }
   return res.json();
+}
+
+export async function parseExamFile(
+  file: File,
+  startPage?: number | null,
+  endPage?: number | null,
+): Promise<CreateExamPayload['questions']> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  if (typeof startPage === 'number' && Number.isFinite(startPage) && startPage > 0) {
+    formData.append('start', String(startPage));
+  }
+  if (typeof endPage === 'number' && Number.isFinite(endPage) && endPage > 0) {
+    formData.append('end', String(endPage));
+  }
+
+  const res = await fetchWithAuth(`${API_BASE}/parse_file`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const errorMsg = await res.text().catch(() => res.statusText);
+    throw new Error(errorMsg || 'Không thể phân tích file đề thi');
+  }
+
+  const data = await res.json();
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('File không chứa câu hỏi hợp lệ để tạo đề thi.');
+  }
+
+  return data as CreateExamPayload['questions'];
 }
 
 // Fetch exams from the backend API
