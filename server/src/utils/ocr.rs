@@ -1,6 +1,5 @@
-
-use anyhow::{Context, anyhow};
-use base64::{Engine as _, engine::general_purpose::STANDARD};
+use anyhow::{anyhow, Context};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use regex::Regex;
 use reqwest::Client;
 use serde_json::json;
@@ -26,17 +25,13 @@ Yêu cầu:
 
     // Allow overriding via env var (recommended): GEMINI_API_KEY
     let api_key = env::var("GEMINI_API_KEY").context("Error during get api key")?;
-    let model = env::var("GEMINI_MODEL").context("Error during get model name")?;
-    let api_url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
-        model
-    );
+    let models_env = env::var("GEMINI_MODEL").context("Error during get model name")?;
 
+    let models = models_env.split(",").collect::<Vec<&str>>();
 
     let data = fs::read(image_path).context("failed to read image file")?;
     let image_b64 = STANDARD.encode(&data);
     let mime_type = "image/jpeg"; // adjust if you use PNG etc.
-
     let payload = json!({
         "contents": [
             {
@@ -49,42 +44,79 @@ Yêu cầu:
     });
 
     let client = Client::new();
-    let body = serde_json::to_string(&payload).context("serialize payload")?;
-    let resp = client
-        .post(&api_url)
-        .header("Content-Type", "application/json")
-        .header("x-goog-api-key", api_key)
-        .body(body)
-        .send()
-        .await
-        .context("request failed")?;
+    for model in models {
+        let api_url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            model
+        );
 
-    let status = resp.status();
-    let text = resp.text().await.context("failed to read response text")?;
-    if !status.is_success() {
-        eprintln!("Gemini API returned error (status: {}):\n{}", status, text);
-        return Err(anyhow!("API error"));
+        //Try 60 second request in 3 times
+        let mut resp_opt = None;
+        for _ in 0..3 {
+            let body = serde_json::to_string(&payload).context("serialize payload")?;
+            match client
+                .post(&api_url)
+                .header("Content-Type", "application/json")
+                .header("x-goog-api-key", &api_key)
+                .body(body)
+                .timeout(std::time::Duration::from_secs(60))
+                .send()
+                .await
+            {
+                Ok(r) => {
+                    resp_opt = Some(r);
+                    break;
+                }
+                Err(e) => {
+                    println!("Request error or timeout for {model}: {e}. Retrying...");
+                }
+            }
+        }
+
+        let resp = match resp_opt {
+            Some(r) => r,
+            None => {
+                println!("Failed after 3 retries for model {model}. Trying next model.");
+                continue;
+            }
+        };
+
+        let status = resp.status();
+        let text = resp.text().await.context("failed to read response text")?;
+        if !status.is_success() {
+            if text.contains("This model is currently experiencing high demand.") {
+                println!("Try {model} model");
+                continue;
+            }
+            eprintln!("Gemini API returned error (status: {}):\n{}", status, text);
+            return Err(anyhow!("API error"));
+        } else {
+            // Try to extract the candidate text similar to OCRT.py
+            let v: serde_json::Value = serde_json::from_str(&text).expect("invalid JSON response");
+            let extracted = v
+                .get("candidates")
+                .and_then(|c| c.get(0))
+                .and_then(|c0| c0.get("content"))
+                .and_then(|content| content.get("parts"))
+                .and_then(|parts| parts.get(0))
+                .and_then(|p0| p0.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("(no text found)");
+
+            let result = result_analyzer(extracted).context("Error during analyzing image")?;
+            // convert to public ParsedQuestion
+            let parsed = result
+                .into_iter()
+                .map(|qa| ParsedQuestion {
+                    question: qa.question,
+                    answers: qa.answers,
+                })
+                .collect();
+            return Ok(parsed);
+        }
     }
 
-    // Try to extract the candidate text similar to OCRT.py
-    let v: serde_json::Value = serde_json::from_str(&text).expect("invalid JSON response");
-    let extracted = v
-        .get("candidates")
-        .and_then(|c| c.get(0))
-        .and_then(|c0| c0.get("content"))
-        .and_then(|content| content.get("parts"))
-        .and_then(|parts| parts.get(0))
-        .and_then(|p0| p0.get("text"))
-        .and_then(|t| t.as_str())
-        .unwrap_or("(no text found)");
-
-    let result = result_analyzer(extracted).context("Error during analyzing image")?;
-    // convert to public ParsedQuestion
-    let parsed = result
-        .into_iter()
-        .map(|qa| ParsedQuestion { question: qa.question, answers: qa.answers })
-        .collect();
-    Ok(parsed)
+    return Err(anyhow!("API error"));
 }
 
 #[derive(Debug)]

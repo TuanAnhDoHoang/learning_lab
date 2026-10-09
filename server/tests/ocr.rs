@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Context};
+use diesel::result::DatabaseErrorInformation;
 use regex::Regex;
 
 #[tokio::test]
@@ -10,7 +11,6 @@ async fn test_ocr() {
 
     use reqwest::Client;
     use serde_json::json;
-    use std::env;
     use std::fs;
 
     // Prompt copied from OCRT.py: ask Gemini to return only the plain text of the exam
@@ -40,15 +40,16 @@ Yêu cầu:
 "#;
 
     // Allow overriding via env var (recommended): GEMINI_API_KEY
-    let api_key = "<API KEY>";
-    let model = "gemini-3.6-flash";
-    let api_url = format!(
-        "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
-        model
-    );
+    let api_key = "<GEMINI_API_KEY>";
+    let models = [
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+    ];
 
     // Image path used in the original run; change if needed.
-    let image_path = "EnExam.jpg";
+    let image_path = "History_Exam.jpg";
 
     let data = fs::read(image_path).expect("failed to read image file");
     let image_b64 = base64::encode(&data);
@@ -66,35 +67,50 @@ Yêu cầu:
     });
 
     let client = Client::new();
-    let resp = client
-        .post(&api_url)
-        .header("Content-Type", "application/json")
-        .header("x-goog-api-key", api_key)
-        .json(&payload)
-        .send()
-        .await
-        .expect("request failed");
 
-    let status = resp.status();
-    let text = resp.text().await.expect("failed to read response text");
-    if !status.is_success() {
-        eprintln!("Gemini API returned error (status: {}):\n{}", status, text);
-        panic!("API error");
+    for (i, model) in models.iter().enumerate() {
+        let api_url = format!(
+            "https://generativelanguage.googleapis.com/v1beta/models/{}:generateContent",
+            model
+        );
+        let resp = client
+            .post(&api_url)
+            .header("Content-Type", "application/json")
+            .header("x-goog-api-key", api_key)
+            .json(&payload)
+            .send()
+            .await
+            .expect("request failed");
+
+        let status = resp.status();
+        let text = resp.text().await.expect("failed to read response text");
+        if !status.is_success() {
+            if text
+                .message()
+                .contains("This model is currently experiencing high demand.")
+            {
+                println!("Try {i} time");
+                continue;
+            }
+            eprintln!("Gemini API returned error (status: {}):\n{}", status, text);
+            panic!("API error");
+        } else {
+            // Try to extract the candidate text similar to OCRT.py
+            let v: serde_json::Value = serde_json::from_str(&text).expect("invalid JSON response");
+            let extracted = v
+                .get("candidates")
+                .and_then(|c| c.get(0))
+                .and_then(|c0| c0.get("content"))
+                .and_then(|content| content.get("parts"))
+                .and_then(|parts| parts.get(0))
+                .and_then(|p0| p0.get("text"))
+                .and_then(|t| t.as_str())
+                .unwrap_or("(no text found)");
+
+            println!("Extracted OCR text:\n{}", extracted);
+            return;
+        }
     }
-
-    // Try to extract the candidate text similar to OCRT.py
-    let v: serde_json::Value = serde_json::from_str(&text).expect("invalid JSON response");
-    let extracted = v
-        .get("candidates")
-        .and_then(|c| c.get(0))
-        .and_then(|c0| c0.get("content"))
-        .and_then(|content| content.get("parts"))
-        .and_then(|parts| parts.get(0))
-        .and_then(|p0| p0.get("text"))
-        .and_then(|t| t.as_str())
-        .unwrap_or("(no text found)");
-
-    println!("Extracted OCR text:\n{}", extracted);
 }
 
 #[derive(Debug)]
@@ -216,6 +232,6 @@ D. đối đầu giữa Liên Xô và Mỹ.
 }
 
 #[tokio::test]
-async fn full_ocr() -> anyhow::Result<()>{
-	Ok(())
+async fn full_ocr() -> anyhow::Result<()> {
+    Ok(())
 }
