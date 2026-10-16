@@ -1,0 +1,47 @@
+# Sao chép thành terraform.tfvars (đã gitignore) rồi điền giá trị thật.
+# Không có secret nào trong file này.
+
+aws_region   = "ap-southeast-1"
+project_name = "stem-digitizer" # PHẢI khớp 00-bootstrap và 10-foundation
+environment  = "demo"
+backend_port = 3000 # PHẢI khớp 10-foundation (A1)
+
+# Bỏ trống = dùng image đẩy lên ECR gần nhất. Muốn chạy một bản cụ thể thì điền tag git SHA (A5).
+# container_image = "<account-id>.dkr.ecr.ap-southeast-1.amazonaws.com/stem-digitizer-backend:<git-sha>"
+
+# Giá trị dưới đây khớp backend learning_lab/server — lý do: Khop_ha_tang_voi_backend.md.
+health_check_path = "/" # app không có /health (A2)
+
+# Tên biến môi trường app đọc -> secret của 10-foundation (A6).
+app_secret_env = {
+  SECRET      = "jwt-secret"
+  ADMIN_ROUTE = "admin-route"
+}
+# App chỉ đọc DATABASE_URL: dùng biến chuẩn libpq, Diesel tự lấy (A3).
+db_env_names = {
+  host     = "PGHOST"
+  port     = "PGPORT"
+  name     = "PGDATABASE"
+  username = "PGUSER"
+  password = "PGPASSWORD"
+}
+extra_environment = {
+  DATABASE_URL = "postgresql://"
+  PGSSLMODE    = "require"
+  URL          = "0.0.0.0:3000"
+}
+rust_log = "info"
+
+# Capacity. App tự migrate lúc khởi động (A4) và WebSocket in-memory (A9, R1): giữ 1 task.
+service_desired_count = 1
+service_min_count     = 1
+service_max_count     = 1
+asg_min_size          = 1
+asg_max_size          = 2
+
+# null = lấy cert origin.<domain> từ 10-foundation; foundation chưa có tên miền thì HTTP trên 443 (A16).
+alb_certificate_arn = null
+
+# RDS — không điền ở đây; truyền bằng -var lúc plan (Huong_dan Mục 7.2, 8.1).
+# rds_restore_snapshot_id = "stem-digitizer-final-YYYYMMDD-hhmm"
+# rds_deletion_protection = false

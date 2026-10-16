@@ -1,0 +1,13 @@
+# Sao chép thành terraform.tfvars (đã gitignore). Không có secret nào trong file này.
+
+aws_region   = "ap-southeast-1"
+project_name = "stem-digitizer"
+environment  = "demo"
+
+# Chỉ khi 10-foundation CHƯA có domain_name. Lấy bằng:
+#   cd ../20-runtime && terraform output -raw alb_dns_name
+# api_origin_domain = "stem-digitizer-alb-xxxx.ap-southeast-1.elb.amazonaws.com"
+
+origin_read_timeout = 60   # 180 sau khi được duyệt tăng hạn mức (R3)
+enable_waf          = true # ~10 USD/tháng
+enable_health_check = true # chỉ có tác dụng khi có tên miền

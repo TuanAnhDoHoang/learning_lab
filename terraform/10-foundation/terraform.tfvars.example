@@ -1,0 +1,60 @@
+# Sao chép thành terraform.tfvars (đã gitignore) rồi điền giá trị thật.
+# Không có secret nào trong file này.
+
+aws_region   = "ap-southeast-1"
+project_name = "stem-digitizer" # PHẢI khớp giá trị ở 00-bootstrap
+environment  = "demo"
+
+# Network
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.0.0/24", "10.0.1.0/24"]
+private_subnet_cidrs = ["10.0.16.0/20", "10.0.32.0/20"]
+enable_flow_logs     = false
+
+# Cảnh báo — BẮT BUỘC điền email thật, không có mặc định.
+# Dùng chung cho Budgets (email trực tiếp) và SNS topic alerts (CloudWatch Alarms).
+# Mỗi email sẽ nhận thư xác nhận từ AWS — phải bấm xác nhận thì mới nhận được cảnh báo SNS.
+alert_emails = ["ten-ban@example.com"]
+
+# Budgets — ngân sách 30 USD, cảnh báo ở 15, 24, 30 và 60 USD
+monthly_budget_usd      = 30
+budget_alert_thresholds = [50, 80, 100, 200]
+
+# Secrets — Terraform chỉ tạo VỎ, giá trị đặt sau bằng put-secret-value (xem README).
+# Mỗi secret khoảng 0,40 USD/tháng. Thêm "gemini-api-key" nếu chốt dùng Gemini.
+app_secret_names = ["jwt-secret", "admin-route"] # admin-route: backend đọc ADMIN_ROUTE lúc khởi động
+
+# S3
+s3_force_destroy          = false # chỉ true khi bỏ hẳn dự án (cho phép xóa bucket còn dữ liệu)
+data_cors_allowed_origins = []    # chờ giả định A14; điền ["https://<domain>"] nếu app upload bằng presigned URL
+
+# Security
+backend_port       = 3000 # giả định A1 — xác nhận với nhóm backend
+bypass_test_cidrs  = []   # chỉ điền IP/32 lúc chạy bài nghiệm thu 7b, xong xóa ngay
+bedrock_model_arns = []   # AI Engine chưa chốt
+ses_identity_arns  = []   # chờ giả định A17 (app có gửi email không)
+enable_ecs_exec    = true
+
+# Network — S3 Gateway Endpoint miễn phí, giảm phí NAT
+enable_s3_gateway_endpoint = true
+
+# ECR — chỉ true khi bỏ hẳn dự án
+ecr_force_delete = false
+
+# DNS (A16) — bỏ trống khi chưa có tên miền.
+# domain_name             = "learninglab.vn"
+# existing_zone_id        = null   # điền nếu domain mua qua Route 53 (zone đã có sẵn)
+# dns_wait_for_validation = false  # lần apply đầu, trước khi trỏ NS ở registrar
+
+# SES (A17) — cần domain_name
+enable_ses = false
+
+# CI/CD — bỏ trống khi chưa có repo. Sau lần apply đầu: xác nhận connection trong Console,
+# rồi đặt enable_cicd_webhooks = true và apply lại.
+# github_repo_url      = "https://github.com/<org>/<repo>.git"
+github_branch        = "main"
+frontend_dir         = "app"        # app_deploy.md
+backend_dir          = "backend"    # A19 — xác nhận với nhóm backend
+backend_dockerfile   = "Dockerfile" # A19 — Dockerfile production, tương đối với backend_dir
+frontend_build_env   = {}           # VITE_* nếu frontend cần, không đặt secret
+enable_cicd_webhooks = false

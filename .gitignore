@@ -1,0 +1,24 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Giá trị biến thật (có thể chứa thông tin nhạy cảm) — chỉ commit file *.example
+*.tfvars
+!*.tfvars.example
+
+# Sinh ra từ output của 00-bootstrap
+terraform/backend.hcl
+**/tfplan.destroy
+
+# GIỮ LẠI .terraform.lock.hcl của các stack (commit lên Git để khóa phiên bản provider).
+# Module không cần lock file riêng — phiên bản provider do stack gọi module quyết định.
+terraform/modules/**/.terraform.lock.hcl

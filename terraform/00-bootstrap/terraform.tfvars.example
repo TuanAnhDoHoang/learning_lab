@@ -1,0 +1,4 @@
+# Sao chép thành terraform.tfvars nếu muốn đổi giá trị mặc định.
+aws_region   = "ap-southeast-1"
+project_name = "stem-digitizer"
+environment  = "prod"
